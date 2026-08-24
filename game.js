@@ -21,12 +21,15 @@
     sound: document.getElementById("soundButton"),
     upgradeList: document.getElementById("upgradeList"),
     upgradeToast: document.getElementById("upgradeToast"),
+    upgradeToastKicker: document.getElementById("upgradeToastKicker"),
     upgradeToastTitle: document.getElementById("upgradeToastTitle"),
     activeWeaponIcon: document.getElementById("activeWeaponIcon"),
     activeWeaponName: document.getElementById("activeWeaponName"),
     activeWeaponStats: document.getElementById("activeWeaponStats"),
     configButton: document.getElementById("configButton"),
     configPopover: document.getElementById("configPopover"),
+    matterValue: document.getElementById("matterValue"),
+    resourceList: document.getElementById("resourceList"),
   };
 
   const TAU = Math.PI * 2;
@@ -41,6 +44,76 @@
     plasma: { name: "Plasma Cannon", description: "Piercing energy orb", delay: 310 },
     railgun: { name: "Rail Driver", description: "Heavy piercing shot", delay: 760 },
   };
+  const resourceCatalog = {
+    iron: { name: "Iron", symbol: "Fe", color: "#aeb5bc", value: 1 },
+    nickel: { name: "Nickel", symbol: "Ni", color: "#ccd3c7", value: 1 },
+    copper: { name: "Copper", symbol: "Cu", color: "#d77945", value: 1 },
+    aluminum: { name: "Aluminum", symbol: "Al", color: "#d8e1e8", value: 1 },
+    magnesium: { name: "Magnesium", symbol: "Mg", color: "#edf3f7", value: 1 },
+    zinc: { name: "Zinc", symbol: "Zn", color: "#a8b5c2", value: 1 },
+    chromium: { name: "Chromium", symbol: "Cr", color: "#d4e2ef", value: 1 },
+    manganese: { name: "Manganese", symbol: "Mn", color: "#a09ba4", value: 1 },
+    cobalt: { name: "Cobalt", symbol: "Co", color: "#5686cb", value: 1 },
+    tin: { name: "Tin", symbol: "Sn", color: "#bdc5c9", value: 1 },
+    lead: { name: "Lead", symbol: "Pb", color: "#747681", value: 1 },
+    titanium: { name: "Titanium", symbol: "Ti", color: "#9aa8bd", value: 2 },
+    beryllium: { name: "Beryllium", symbol: "Be", color: "#b7e7cf", value: 3 },
+    lithium: { name: "Lithium", symbol: "Li", color: "#e8d7e9", value: 2 },
+    vanadium: { name: "Vanadium", symbol: "V", color: "#93a1ad", value: 2 },
+    zirconium: { name: "Zirconium", symbol: "Zr", color: "#c6dbdd", value: 2 },
+    niobium: { name: "Niobium", symbol: "Nb", color: "#8cb3ba", value: 2 },
+    molybdenum: { name: "Molybdenum", symbol: "Mo", color: "#89959f", value: 2 },
+    silver: { name: "Silver", symbol: "Ag", color: "#f1f5ff", value: 2 },
+    cadmium: { name: "Cadmium", symbol: "Cd", color: "#b8c0c7", value: 2 },
+    gallium: { name: "Gallium", symbol: "Ga", color: "#c4d8e1", value: 2 },
+    indium: { name: "Indium", symbol: "In", color: "#aebbd8", value: 2 },
+    gold: { name: "Gold", symbol: "Au", color: "#ffd34e", value: 4 },
+    platinum: { name: "Platinum", symbol: "Pt", color: "#e6edf2", value: 4 },
+    palladium: { name: "Palladium", symbol: "Pd", color: "#d6dedf", value: 3 },
+    tungsten: { name: "Tungsten", symbol: "W", color: "#727d87", value: 3 },
+    tantalum: { name: "Tantalum", symbol: "Ta", color: "#66788d", value: 3 },
+    rhodium: { name: "Rhodium", symbol: "Rh", color: "#eff8ff", value: 4 },
+    iridium: { name: "Iridium", symbol: "Ir", color: "#c7d6e5", value: 4 },
+    osmium: { name: "Osmium", symbol: "Os", color: "#748b9e", value: 4 },
+    ruthenium: { name: "Ruthenium", symbol: "Ru", color: "#bdcbd2", value: 3 },
+    hafnium: { name: "Hafnium", symbol: "Hf", color: "#a4b6bf", value: 3 },
+    rhenium: { name: "Rhenium", symbol: "Re", color: "#8c9ba5", value: 4 },
+    neodymium: { name: "Neodymium", symbol: "Nd", color: "#be8ee5", value: 3 },
+    cerium: { name: "Cerium", symbol: "Ce", color: "#d1a884", value: 3 },
+    thorium: { name: "Thorium", symbol: "Th", color: "#6fd793", value: 4 },
+    uranium: { name: "Uranium", symbol: "U", color: "#83f052", value: 5 },
+    sodium: { name: "Sodium", symbol: "Na", color: "#e4d8b1", value: 1 },
+    potassium: { name: "Potassium", symbol: "K", color: "#c9b6d8", value: 1 },
+    calcium: { name: "Calcium", symbol: "Ca", color: "#e5e1d4", value: 1 },
+    scandium: { name: "Scandium", symbol: "Sc", color: "#c7d2d8", value: 2 },
+    rubidium: { name: "Rubidium", symbol: "Rb", color: "#c59ac9", value: 2 },
+    strontium: { name: "Strontium", symbol: "Sr", color: "#e7c5b8", value: 2 },
+    yttrium: { name: "Yttrium", symbol: "Y", color: "#b9c9ce", value: 2 },
+    technetium: { name: "Technetium", symbol: "Tc", color: "#87999f", value: 4 },
+    mercury: { name: "Mercury", symbol: "Hg", color: "#d6d9e1", value: 3 },
+    cesium: { name: "Cesium", symbol: "Cs", color: "#dbc58e", value: 3 },
+    barium: { name: "Barium", symbol: "Ba", color: "#c7d5bf", value: 2 },
+    lanthanum: { name: "Lanthanum", symbol: "La", color: "#b9c7c0", value: 3 },
+    praseodymium: { name: "Praseodymium", symbol: "Pr", color: "#a7c79d", value: 3 },
+    samarium: { name: "Samarium", symbol: "Sm", color: "#c1a8a4", value: 3 },
+    europium: { name: "Europium", symbol: "Eu", color: "#cfa2bf", value: 4 },
+    gadolinium: { name: "Gadolinium", symbol: "Gd", color: "#aebfc0", value: 3 },
+    terbium: { name: "Terbium", symbol: "Tb", color: "#93c6a3", value: 4 },
+    dysprosium: { name: "Dysprosium", symbol: "Dy", color: "#a9b6cc", value: 4 },
+    holmium: { name: "Holmium", symbol: "Ho", color: "#b0c5b2", value: 4 },
+    erbium: { name: "Erbium", symbol: "Er", color: "#d2a6c5", value: 4 },
+    thulium: { name: "Thulium", symbol: "Tm", color: "#a6c9cf", value: 4 },
+    ytterbium: { name: "Ytterbium", symbol: "Yb", color: "#b3c2b7", value: 4 },
+    lutetium: { name: "Lutetium", symbol: "Lu", color: "#9fb3bb", value: 4 },
+    thallium: { name: "Thallium", symbol: "Tl", color: "#8f9ca7", value: 3 },
+    bismuth: { name: "Bismuth", symbol: "Bi", color: "#d091bd", value: 4 },
+    polonium: { name: "Polonium", symbol: "Po", color: "#86d784", value: 5 },
+    radium: { name: "Radium", symbol: "Ra", color: "#9bff75", value: 5 },
+    actinium: { name: "Actinium", symbol: "Ac", color: "#78e2a2", value: 5 },
+    protactinium: { name: "Protactinium", symbol: "Pa", color: "#6acb82", value: 5 },
+  };
+  const commonMetals = ["iron", "nickel", "copper", "aluminum", "magnesium", "cobalt", "chromium", "zinc"];
+  const exoticMetals = Object.keys(resourceCatalog).filter((id) => !commonMetals.includes(id) && !["silver", "gold", "titanium", "beryllium"].includes(id));
 
   let width = window.innerWidth;
   let height = window.innerHeight;
@@ -50,6 +123,7 @@
   let score = 0;
   let highScore = Number(localStorage.getItem("starfall-high-score") || 0);
   let health = 100;
+  let maxHealth = 100;
   let shield = 0;
   let shieldMax = 0;
   let weapon = "laser";
@@ -64,6 +138,10 @@
   let asteroidSequence = 0;
   let destroyedCount = 0;
   let toastTimer = 0;
+  let shootingStarClock = 0;
+  let nextShootingStar = random(7, 12);
+  let matterBalance = 0;
+  let timeSinceDamage = 0;
 
   const keys = new Set();
   const stars = [];
@@ -72,11 +150,18 @@
   const particles = [];
   const shockwaves = [];
   const powerUps = [];
+  const resourceDrops = [];
+  const shootingStars = [];
   const mobileVector = { x: 0, y: 0 };
+  const resourceInventory = {};
   const upgrades = {
     fireRate: 0,
     wideShot: 0,
     shield: 0,
+    engine: 0,
+    maneuver: 0,
+    armor: 0,
+    regeneration: 0,
     missile: 0,
     plasma: 0,
     railgun: 0,
@@ -129,6 +214,7 @@
   function resetGame() {
     score = 0;
     health = 100;
+    maxHealth = 100;
     shield = 0;
     shieldMax = 0;
     elapsed = 0;
@@ -137,11 +223,18 @@
     screenShake = 0;
     destroyedCount = 0;
     toastTimer = 0;
+    shootingStarClock = 0;
+    nextShootingStar = random(7, 12);
+    matterBalance = 0;
+    timeSinceDamage = 0;
     asteroids.length = 0;
     projectiles.length = 0;
     particles.length = 0;
     shockwaves.length = 0;
     powerUps.length = 0;
+    resourceDrops.length = 0;
+    shootingStars.length = 0;
+    Object.keys(resourceInventory).forEach((key) => delete resourceInventory[key]);
     Object.keys(upgrades).forEach((key) => { upgrades[key] = 0; });
     unlockedWeapons.clear();
     unlockedWeapons.add("laser");
@@ -152,6 +245,7 @@
     ship.invulnerable = 0;
     selectWeapon("laser", false);
     updateUpgradeUi();
+    updateResourceUi();
     updateHud(true);
   }
 
@@ -231,6 +325,32 @@
     return Math.floor(elapsed / 28) + 1;
   }
 
+  function chooseAsteroidComposition() {
+    const roll = Math.random();
+    if (roll < 0.7) return { label: "Rock", rockRatio: 1, metals: [] };
+    if (roll < 0.81) {
+      const first = commonMetals[Math.floor(Math.random() * commonMetals.length)];
+      let second = commonMetals[Math.floor(Math.random() * commonMetals.length)];
+      if (second === first) second = "iron";
+      return { label: "Common-metal rock", rockRatio: 0.68, metals: [{ id: first, amount: 1 }, { id: second, amount: 1 }] };
+    }
+    if (roll < 0.855) return { label: "Silver-bearing rock", rockRatio: 0.66, metals: [{ id: "silver", amount: 1 }] };
+    if (roll < 0.87) return { label: "Silver-rich asteroid", rockRatio: 0.12, metals: [{ id: "silver", amount: 2 }] };
+    if (roll < 0.9) return { label: "Gold-bearing rock", rockRatio: 0.68, metals: [{ id: "gold", amount: 1 }] };
+    if (roll < 0.92) return { label: "Gold-silver rock", rockRatio: 0.56, metals: [{ id: "gold", amount: 1 }, { id: "silver", amount: 1 }] };
+    if (roll < 0.95) return { label: "Titanium-rich", rockRatio: 0.38, metals: [{ id: "titanium", amount: 2 }] };
+    if (roll < 0.965) return { label: "Beryllium-rich", rockRatio: 0.44, metals: [{ id: "beryllium", amount: 1 }] };
+    if (roll < 0.985) {
+      const id = exoticMetals[Math.floor(Math.random() * exoticMetals.length)];
+      return { label: `${resourceCatalog[id].name}-bearing`, rockRatio: 0.5, metals: [{ id, amount: 1 }] };
+    }
+    const metalPool = Object.keys(resourceCatalog);
+    const first = metalPool[Math.floor(Math.random() * metalPool.length)];
+    let second = metalPool[Math.floor(Math.random() * metalPool.length)];
+    if (second === first) second = "nickel";
+    return { label: "Metallic asteroid", rockRatio: 0.12, metals: [{ id: first, amount: 2 }, { id: second, amount: 1 }] };
+  }
+
   function spawnAsteroid() {
     const roll = Math.random();
     const type = roll < 0.48 ? "small" : roll < 0.82 ? "medium" : "large";
@@ -240,6 +360,7 @@
       large: { radius: random(38, 52), hp: 6, speed: random(50, 82), score: 600 },
     }[type];
     const radius = config.radius;
+    const composition = chooseAsteroidComposition();
     const vertexCount = Math.floor(random(8, 13));
     const vertices = Array.from({ length: vertexCount }, (_, i) => ({
       angle: (i / vertexCount) * TAU,
@@ -250,6 +371,21 @@
       y: random(-0.45, 0.45) * radius,
       r: random(0.09, 0.22) * radius,
     }));
+    const mineralPatches = composition.metals.flatMap((metal) => {
+      const count = Math.max(2, Math.round((1.15 - composition.rockRatio) * random(4, 8)));
+      return Array.from({ length: count }, () => {
+        const angle = random(0, TAU);
+        const distance = random(0.12, 0.72) * radius;
+        return {
+          id: metal.id,
+          x: Math.cos(angle) * distance,
+          y: Math.sin(angle) * distance,
+          r: random(0.08, 0.2) * radius,
+          stretch: random(0.35, 0.8),
+          rotation: random(0, TAU),
+        };
+      });
+    });
     asteroids.push({
       id: ++asteroidSequence,
       x: random(radius + 8, width - radius - 8),
@@ -265,6 +401,8 @@
       rotationSpeed: random(-0.7, 0.7),
       vertices,
       craters,
+      composition,
+      mineralPatches,
       flash: 0,
     });
   }
@@ -390,6 +528,7 @@
     if (cause !== "ship") {
       score += asteroid.score;
       destroyedCount += 1;
+      dropAsteroidResources(asteroid);
       const dropChance = asteroid.type === "large" ? 0.34 : asteroid.type === "medium" ? 0.17 : 0.08;
       if (destroyedCount === 5 && unlockedWeapons.size === 1) {
         spawnUpgrade(asteroid.x, asteroid.y, "missile");
@@ -406,11 +545,43 @@
     playTone("impact", strength);
   }
 
+  function dropAsteroidResources(asteroid) {
+    if (!asteroid.composition.metals.length) return;
+    const sizeYield = asteroid.type === "large" ? 3 : asteroid.type === "medium" ? 2 : 1;
+    for (const metal of asteroid.composition.metals) {
+      resourceDrops.push({
+        id: metal.id,
+        amount: metal.amount * sizeYield,
+        x: asteroid.x + random(-8, 8),
+        y: asteroid.y + random(-8, 8),
+        vx: random(-52, 52),
+        vy: random(28, 72),
+        radius: 11,
+        phase: random(0, TAU),
+        life: 14,
+      });
+    }
+  }
+
+  function collectResource(drop) {
+    const resource = resourceCatalog[drop.id];
+    resourceInventory[drop.id] = (resourceInventory[drop.id] || 0) + drop.amount;
+    const gainedMatter = drop.amount * resource.value;
+    matterBalance += gainedMatter;
+    updateResourceUi();
+    showUpgradeToast(`${resource.symbol} ${resource.name.toUpperCase()} ×${drop.amount} · +${gainedMatter} MU`, "RESOURCE RECOVERED");
+    playTone("resource");
+  }
+
   function spawnUpgrade(x, y, preferredType = null) {
     const candidates = [];
     if (upgrades.fireRate < 5) candidates.push("fireRate", "fireRate");
     if (upgrades.wideShot < 4) candidates.push("wideShot", "wideShot");
     if (upgrades.shield < 4 || shield < shieldMax) candidates.push("shield", "shield");
+    if (upgrades.engine < 4) candidates.push("engine");
+    if (upgrades.maneuver < 4) candidates.push("maneuver");
+    if (upgrades.armor < 4) candidates.push("armor");
+    if (upgrades.regeneration < 4) candidates.push("regeneration");
     if (upgrades.missile < 3) candidates.push("missile", "missile");
     if (upgrades.plasma < 3) candidates.push("plasma");
     if (upgrades.railgun < 3) candidates.push("railgun");
@@ -441,6 +612,20 @@
       shieldMax = Math.min(110, 35 + (upgrades.shield - 1) * 25);
       shield = shieldMax;
       label = upgrades.shield === 1 ? "DEFLECTOR SHIELD ONLINE" : `SHIELD ARRAY MK ${upgrades.shield}`;
+    } else if (type === "engine") {
+      upgrades.engine = Math.min(4, upgrades.engine + 1);
+      label = `ENGINE THRUST MK ${upgrades.engine}`;
+    } else if (type === "maneuver") {
+      upgrades.maneuver = Math.min(4, upgrades.maneuver + 1);
+      label = `MANOEUVRING MK ${upgrades.maneuver}`;
+    } else if (type === "armor") {
+      upgrades.armor = Math.min(4, upgrades.armor + 1);
+      maxHealth = 100 + upgrades.armor * 25;
+      health = Math.min(maxHealth, health + 25);
+      label = `ARMOUR PLATING MK ${upgrades.armor}`;
+    } else if (type === "regeneration") {
+      upgrades.regeneration = Math.min(4, upgrades.regeneration + 1);
+      label = `HULL REGENERATION MK ${upgrades.regeneration}`;
     } else if (type === "missile") {
       upgrades.missile = Math.min(3, upgrades.missile + 1);
       unlockedWeapons.add("missile");
@@ -462,10 +647,11 @@
     playTone("upgrade");
   }
 
-  function showUpgradeToast(label) {
+  function showUpgradeToast(label, kicker = "UPGRADE ACQUIRED") {
+    ui.upgradeToastKicker.textContent = kicker;
     ui.upgradeToastTitle.textContent = label;
     ui.upgradeToast.classList.add("visible");
-    ui.announcer.textContent = `Upgrade acquired: ${label}`;
+    ui.announcer.textContent = `${kicker}: ${label}`;
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => ui.upgradeToast.classList.remove("visible"), 2200);
   }
@@ -475,10 +661,63 @@
     if (upgrades.fireRate) chips.push(`<span class="upgrade-chip">OVERDRIVE ${upgrades.fireRate}</span>`);
     if (upgrades.wideShot) chips.push(`<span class="upgrade-chip">WIDE ${upgrades.wideShot}</span>`);
     if (upgrades.shield) chips.push(`<span class="upgrade-chip shield">SHIELD ${Math.round(shield)}/${shieldMax}</span>`);
+    if (upgrades.engine) chips.push(`<span class="upgrade-chip">ENGINE ${upgrades.engine}</span>`);
+    if (upgrades.maneuver) chips.push(`<span class="upgrade-chip">MANOEUVRE ${upgrades.maneuver}</span>`);
+    if (upgrades.armor) chips.push(`<span class="upgrade-chip">ARMOUR ${upgrades.armor}</span>`);
+    if (upgrades.regeneration) chips.push(`<span class="upgrade-chip shield">REGEN ${upgrades.regeneration}</span>`);
     if (upgrades.missile) chips.push(`<span class="upgrade-chip weapon">MISSILE ${upgrades.missile}</span>`);
     if (upgrades.plasma) chips.push(`<span class="upgrade-chip weapon">PLASMA ${upgrades.plasma}</span>`);
     if (upgrades.railgun) chips.push(`<span class="upgrade-chip weapon">RAIL ${upgrades.railgun}</span>`);
     ui.upgradeList.innerHTML = chips.length ? chips.join("") : '<span class="empty-upgrades">NO UPGRADES INSTALLED</span>';
+    updateFabricatorButtons();
+  }
+
+  const fabricationCosts = { fireRate: 8, wideShot: 10, shield: 12, repair: 7, engine: 10, maneuver: 9, armor: 14, regeneration: 16 };
+
+  function updateResourceUi() {
+    ui.matterValue.textContent = String(Math.floor(matterBalance));
+    const collected = Object.entries(resourceInventory)
+      .filter(([, amount]) => amount > 0)
+      .sort((a, b) => resourceCatalog[b[0]].value - resourceCatalog[a[0]].value || b[1] - a[1]);
+    ui.resourceList.innerHTML = collected.length
+      ? collected.map(([id, amount]) => {
+        const resource = resourceCatalog[id];
+        return `<span class="resource-chip" title="${resource.name}"><i style="--resource-color:${resource.color}"></i>${resource.symbol} ×${amount}</span>`;
+      }).join("")
+      : '<span class="empty-resources">NO ELEMENTS RECOVERED</span>';
+    updateFabricatorButtons();
+  }
+
+  function fabricationAtMax(type) {
+    if (type === "repair") return health >= maxHealth;
+    const limits = { fireRate: 5, wideShot: 4, shield: 4, engine: 4, maneuver: 4, armor: 4, regeneration: 4 };
+    return upgrades[type] >= limits[type];
+  }
+
+  function updateFabricatorButtons() {
+    document.querySelectorAll("[data-fabricate]").forEach((button) => {
+      const type = button.dataset.fabricate;
+      button.disabled = matterBalance < fabricationCosts[type] || fabricationAtMax(type);
+      button.title = fabricationAtMax(type) ? "Maximum level reached" : `${fabricationCosts[type]} refined matter units`;
+    });
+  }
+
+  function fabricate(type) {
+    const cost = fabricationCosts[type];
+    if (!cost || matterBalance < cost || fabricationAtMax(type)) {
+      showUpgradeToast("INSUFFICIENT REFINED MATTER", "FABRICATION FAILED");
+      return;
+    }
+    matterBalance -= cost;
+    if (type === "repair") {
+      health = Math.min(maxHealth, health + 45);
+      showUpgradeToast("HULL INTEGRITY RESTORED", "FABRICATION COMPLETE");
+      playTone("upgrade");
+    } else {
+      applyUpgrade(type);
+      ui.upgradeToastKicker.textContent = "FABRICATION COMPLETE";
+    }
+    updateResourceUi();
   }
 
   function createSparks(x, y, count, color) {
@@ -522,7 +761,9 @@
 
   function damageShip(amount, x, y) {
     if (ship.invulnerable > 0 || state !== "running") return;
-    let remainingDamage = amount;
+    timeSinceDamage = 0;
+    const armorReduction = upgrades.armor * 0.09;
+    let remainingDamage = amount * (1 - armorReduction);
     if (shield > 0) {
       const absorbed = Math.min(shield, remainingDamage);
       shield -= absorbed;
@@ -548,12 +789,37 @@
     }
   }
 
+  function spawnShootingStar() {
+    const fromLeft = Math.random() < 0.5;
+    const speed = random(480, 690);
+    const angle = random(0.28, 0.48);
+    shootingStars.push({
+      x: fromLeft ? -80 : width + 80,
+      y: random(110, Math.max(150, height * 0.42)),
+      vx: Math.cos(angle) * speed * (fromLeft ? 1 : -1),
+      vy: Math.sin(angle) * speed,
+      radius: random(8, 13),
+      life: 4,
+      phase: random(0, TAU),
+    });
+  }
+
   function update(dt, now) {
     updateStars(dt);
     if (state !== "running") return;
 
     elapsed += dt;
+    timeSinceDamage += dt;
     ship.invulnerable = Math.max(0, ship.invulnerable - dt);
+    if (upgrades.regeneration > 0 && timeSinceDamage > 3.5 && health < maxHealth) {
+      health = Math.min(maxHealth, health + (0.5 + upgrades.regeneration * 0.65) * dt);
+    }
+    shootingStarClock += dt;
+    if (shootingStarClock >= nextShootingStar) {
+      shootingStarClock = 0;
+      nextShootingStar = random(7, 13);
+      spawnShootingStar();
+    }
     const wave = getWave();
     const spawnDelay = Math.max(0.48, 1.25 - (wave - 1) * 0.05);
     spawnClock += dt;
@@ -576,15 +842,16 @@
       dx /= magnitude;
       dy /= magnitude;
     }
-    const response = 1 - Math.exp(-dt * 13);
-    ship.vx += (dx * ship.speed - ship.vx) * response;
-    ship.vy += (dy * ship.speed - ship.vy) * response;
+    const effectiveSpeed = ship.speed + upgrades.engine * 48;
+    const response = 1 - Math.exp(-dt * (13 + upgrades.maneuver * 3.2));
+    ship.vx += (dx * effectiveSpeed - ship.vx) * response;
+    ship.vy += (dy * effectiveSpeed - ship.vy) * response;
     if (Math.abs(dx) < 0.02) ship.vx *= Math.pow(0.02, dt);
     if (Math.abs(dy) < 0.02) ship.vy *= Math.pow(0.02, dt);
-    const shipHalfWidth = 31 + upgrades.wideShot * 3;
+    const shipHalfWidth = 31 + upgrades.wideShot * 3 + upgrades.armor * 1.5 + upgrades.engine;
     ship.x = clamp(ship.x + ship.vx * dt, shipHalfWidth + 8, width - shipHalfWidth - 8);
     ship.y = clamp(ship.y + ship.vy * dt, 104 + 34, height - 35);
-    ship.tilt += (clamp(ship.vx / ship.speed, -1, 1) * 0.32 - ship.tilt) * response;
+    ship.tilt += (clamp(ship.vx / effectiveSpeed, -1, 1) * (0.32 + upgrades.maneuver * 0.025) - ship.tilt) * response;
 
     if (keys.has("Space") || mobileFiring) fire(now);
 
@@ -713,6 +980,43 @@
       if (pickup.life <= 0 || pickup.y - pickup.radius > height) powerUps.splice(i, 1);
     }
 
+    for (let i = resourceDrops.length - 1; i >= 0; i -= 1) {
+      const drop = resourceDrops[i];
+      drop.life -= dt;
+      drop.phase += dt * 2.6;
+      const dist = Math.sqrt(distanceSq(drop, ship));
+      if (dist < 165) {
+        const attraction = 290 * (1 - dist / 165) + 95;
+        drop.vx += ((ship.x - drop.x) / Math.max(1, dist)) * attraction * dt;
+        drop.vy += ((ship.y - drop.y) / Math.max(1, dist)) * attraction * dt;
+      }
+      drop.x += drop.vx * dt;
+      drop.y += drop.vy * dt;
+      drop.vx *= Math.pow(0.97, dt * 60);
+      if (dist <= drop.radius + ship.radius + 5) {
+        resourceDrops.splice(i, 1);
+        collectResource(drop);
+        continue;
+      }
+      if (drop.life <= 0 || drop.y - drop.radius > height) resourceDrops.splice(i, 1);
+    }
+
+    for (let i = shootingStars.length - 1; i >= 0; i -= 1) {
+      const star = shootingStars[i];
+      star.life -= dt;
+      star.phase += dt * 9;
+      star.x += star.vx * dt;
+      star.y += star.vy * dt;
+      const collisionRadius = star.radius + ship.radius;
+      if (distanceSq(star, ship) <= collisionRadius * collisionRadius) {
+        shootingStars.splice(i, 1);
+        createExplosion(star.x, star.y, 24, 1.1);
+        damageShip(24, star.x, star.y);
+        continue;
+      }
+      if (star.life <= 0 || star.y > height + 100 || star.x < -140 || star.x > width + 140) shootingStars.splice(i, 1);
+    }
+
     updateEffects(dt);
     screenShake *= Math.pow(0.02, dt);
     radarClock += dt;
@@ -750,14 +1054,16 @@
     ui.score.textContent = padScore(score);
     ui.highScore.textContent = padScore(Math.max(highScore, score));
     ui.wave.textContent = String(getWave()).padStart(2, "0");
-    ui.health.textContent = `${Math.round(health)}%`;
-    ui.healthBar.style.width = `${health}%`;
-    const healthColor = health > 55 ? "#43ffc0" : health > 25 ? "#ffb347" : "#ff3f57";
+    const healthRatio = health / maxHealth;
+    ui.health.textContent = maxHealth > 100 ? `${Math.round(health)} / ${maxHealth}` : `${Math.round(healthRatio * 100)}%`;
+    ui.healthBar.style.width = `${healthRatio * 100}%`;
+    const healthColor = healthRatio > 0.55 ? "#43ffc0" : healthRatio > 0.25 ? "#ffb347" : "#ff3f57";
     ui.health.style.color = healthColor;
     ui.healthBar.style.background = healthColor;
     ui.shield.textContent = shieldMax > 0 ? `${Math.round(shield)} / ${shieldMax}` : "OFFLINE";
     ui.shieldBar.style.width = `${shieldMax > 0 ? (shield / shieldMax) * 100 : 0}%`;
-    ui.threats.textContent = `${asteroids.length} ${asteroids.length === 1 ? "CONTACT" : "CONTACTS"}`;
+    const contacts = asteroids.length + shootingStars.length;
+    ui.threats.textContent = `${contacts} ${contacts === 1 ? "CONTACT" : "CONTACTS"}`;
     if (forceRadar) updateRadar();
   }
 
@@ -768,6 +1074,13 @@
       dot.className = "radar-dot";
       dot.style.left = `${clamp((asteroid.x / width) * 60 + 4, 3, 64)}px`;
       dot.style.top = `${clamp((asteroid.y / height) * 54 + 4, 3, 57)}px`;
+      ui.radar.appendChild(dot);
+    }
+    for (const star of shootingStars) {
+      const dot = document.createElement("i");
+      dot.className = "radar-dot shooting-star-dot";
+      dot.style.left = `${clamp((star.x / width) * 60 + 4, 3, 64)}px`;
+      dot.style.top = `${clamp((star.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
     }
   }
@@ -788,7 +1101,9 @@
     const shakeY = screenShake ? random(-screenShake, screenShake) : 0;
     ctx.translate(shakeX, shakeY);
     drawGuideLines();
+    for (const star of shootingStars) drawShootingStar(star);
     for (const asteroid of asteroids) drawAsteroid(asteroid);
+    for (const drop of resourceDrops) drawResourceDrop(drop);
     for (const pickup of powerUps) drawPowerUp(pickup);
     for (const projectile of projectiles) drawProjectile(projectile);
     drawEffects();
@@ -839,16 +1154,83 @@
     ctx.restore();
   }
 
+  function drawShootingStar(star) {
+    ctx.save();
+    ctx.translate(star.x, star.y);
+    ctx.rotate(Math.atan2(star.vy, star.vx));
+    ctx.globalCompositeOperation = "lighter";
+    const tailLength = 105 + star.radius * 4;
+    const tail = ctx.createLinearGradient(-tailLength, 0, star.radius, 0);
+    tail.addColorStop(0, "rgba(255, 61, 93, 0)");
+    tail.addColorStop(0.55, "rgba(255, 96, 82, 0.22)");
+    tail.addColorStop(0.88, "rgba(255, 219, 153, 0.82)");
+    tail.addColorStop(1, "#ffffff");
+    ctx.strokeStyle = tail;
+    ctx.lineWidth = star.radius * 0.75;
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "#ff4d59";
+    ctx.beginPath();
+    ctx.moveTo(-tailLength, 0);
+    ctx.lineTo(star.radius, 0);
+    ctx.stroke();
+    const core = ctx.createRadialGradient(0, 0, 1, 0, 0, star.radius);
+    core.addColorStop(0, "#ffffff");
+    core.addColorStop(0.35, "#fff0c4");
+    core.addColorStop(0.72, "#ff704f");
+    core.addColorStop(1, "rgba(255, 54, 92, 0)");
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(0, 0, star.radius, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawResourceDrop(drop) {
+    const resource = resourceCatalog[drop.id];
+    const pulse = 1 + Math.sin(drop.phase * 2) * 0.09;
+    ctx.save();
+    ctx.translate(drop.x, drop.y);
+    ctx.rotate(drop.phase);
+    ctx.scale(pulse, pulse);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = resource.color;
+    const crystal = ctx.createLinearGradient(-drop.radius, -drop.radius, drop.radius, drop.radius);
+    crystal.addColorStop(0, "#ffffff");
+    crystal.addColorStop(0.24, resource.color);
+    crystal.addColorStop(1, "rgba(22, 30, 39, 0.82)");
+    ctx.fillStyle = crystal;
+    ctx.strokeStyle = resource.color;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, -drop.radius);
+    ctx.lineTo(drop.radius * 0.72, -drop.radius * 0.15);
+    ctx.lineTo(drop.radius * 0.42, drop.radius);
+    ctx.lineTo(-drop.radius * 0.55, drop.radius * 0.72);
+    ctx.lineTo(-drop.radius * 0.78, -drop.radius * 0.22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.rotate(-drop.phase);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 7px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(resource.symbol, 0, 0);
+    ctx.restore();
+  }
+
   function drawAsteroid(asteroid) {
     ctx.save();
     ctx.translate(asteroid.x, asteroid.y);
     ctx.rotate(asteroid.rotation);
     ctx.shadowBlur = 24;
     ctx.shadowColor = asteroid.flash > 0 ? "rgba(120, 247, 255, .75)" : "rgba(255, 104, 45, .08)";
+    const metalRichness = 1 - asteroid.composition.rockRatio;
     const gradient = ctx.createRadialGradient(-asteroid.radius * 0.35, -asteroid.radius * 0.4, 1, 0, 0, asteroid.radius * 1.1);
-    gradient.addColorStop(0, asteroid.flash > 0 ? "#c8fdff" : "#89919a");
-    gradient.addColorStop(0.35, asteroid.flash > 0 ? "#6feeff" : "#4c535c");
-    gradient.addColorStop(1, "#171c23");
+    gradient.addColorStop(0, asteroid.flash > 0 ? "#c8fdff" : metalRichness > 0.7 ? "#d3dae0" : "#89919a");
+    gradient.addColorStop(0.35, asteroid.flash > 0 ? "#6feeff" : metalRichness > 0.7 ? "#78858e" : "#4c535c");
+    gradient.addColorStop(1, metalRichness > 0.7 ? "#2d353b" : "#171c23");
     ctx.fillStyle = gradient;
     ctx.strokeStyle = asteroid.flash > 0 ? "#b7fbff" : "rgba(172, 194, 211, 0.42)";
     ctx.lineWidth = 1.2;
@@ -870,6 +1252,32 @@
       ctx.ellipse(crater.x, crater.y, crater.r, crater.r * 0.7, 0.4, 0, TAU);
       ctx.fill();
       ctx.stroke();
+    }
+    for (const patch of asteroid.mineralPatches) {
+      const metal = resourceCatalog[patch.id];
+      ctx.save();
+      ctx.translate(patch.x, patch.y);
+      ctx.rotate(patch.rotation);
+      ctx.shadowBlur = metal.value >= 4 ? 9 : 4;
+      ctx.shadowColor = metal.color;
+      const ore = ctx.createRadialGradient(-patch.r * 0.3, -patch.r * 0.3, 0, 0, 0, patch.r);
+      ore.addColorStop(0, "#ffffff");
+      ore.addColorStop(0.2, metal.color);
+      ore.addColorStop(0.72, metal.color);
+      ore.addColorStop(1, "rgba(20, 25, 29, 0.55)");
+      ctx.fillStyle = ore;
+      ctx.strokeStyle = `${metal.color}99`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, patch.r, patch.r * patch.stretch, 0, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,.45)";
+      ctx.beginPath();
+      ctx.moveTo(-patch.r * 0.45, -patch.r * 0.15);
+      ctx.lineTo(patch.r * 0.35, patch.r * 0.1);
+      ctx.stroke();
+      ctx.restore();
     }
     if (asteroid.maxHp > 1 && asteroid.hp < asteroid.maxHp) {
       const ratio = asteroid.hp / asteroid.maxHp;
@@ -965,11 +1373,15 @@
       fireRate: "#ff9f45",
       wideShot: "#56f4ff",
       shield: "#63b8ff",
+      engine: "#ff9d4a",
+      maneuver: "#46e6ff",
+      armor: "#c6d2dc",
+      regeneration: "#52ff9b",
       missile: "#ff8345",
       plasma: "#b56cff",
       railgun: "#ffe36e",
     };
-    const glyphs = { fireRate: "F", wideShot: "W", shield: "S", missile: "M", plasma: "P", railgun: "R" };
+    const glyphs = { fireRate: "F", wideShot: "W", shield: "S", engine: "E", maneuver: "T", armor: "A", regeneration: "+", missile: "M", plasma: "P", railgun: "R" };
     const color = colors[pickup.type];
     const pulse = 1 + Math.sin(pickup.phase * 2) * 0.1;
     ctx.save();
@@ -1038,7 +1450,7 @@
     ctx.translate(ship.x, ship.y);
     if (ship.invulnerable > 0 && Math.floor(ship.invulnerable * 16) % 2 === 0) ctx.globalAlpha = 0.38;
 
-    const totalTier = upgrades.fireRate + upgrades.wideShot + upgrades.shield + upgrades.missile + upgrades.plasma + upgrades.railgun;
+    const totalTier = upgrades.fireRate + upgrades.wideShot + upgrades.shield + upgrades.engine + upgrades.maneuver + upgrades.armor + upgrades.regeneration + upgrades.missile + upgrades.plasma + upgrades.railgun;
     const wingSpan = 31 + upgrades.wideShot * 3 + Math.min(4, totalTier * 0.25);
     const shieldRadius = 39 + upgrades.shield * 3;
     const weaponColor = { laser: "#56f4ff", missile: "#ff8345", plasma: "#b56cff", railgun: "#ffe36e" }[weapon];
@@ -1070,9 +1482,9 @@
     ctx.rotate(ship.tilt);
 
     // Multi-nozzle ion drive. Overdrive upgrades add a brighter central engine.
-    const enginePositions = upgrades.fireRate >= 2 ? [-13, 0, 13] : [-11, 11];
+    const enginePositions = upgrades.fireRate + upgrades.engine >= 2 ? [-13, 0, 13] : [-11, 11];
     for (const engineX of enginePositions) {
-      const thrust = state === "running" ? random(18, 28 + upgrades.fireRate * 3) : 12;
+      const thrust = state === "running" ? random(18, 28 + upgrades.fireRate * 3 + upgrades.engine * 5) : 12;
       const flame = ctx.createLinearGradient(engineX, 13, engineX, 15 + thrust);
       flame.addColorStop(0, "#ffffff");
       flame.addColorStop(0.2, upgrades.fireRate >= 3 ? "#b56cff" : "#56f4ff");
@@ -1280,6 +1692,74 @@
       ctx.fill();
     }
 
+    // Engine upgrades install larger orange drive vanes around the nacelles.
+    for (let i = 0; i < upgrades.engine; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      const vaneX = side * (13 + row * 6);
+      ctx.fillStyle = "#3d4650";
+      ctx.strokeStyle = "#ffad5d";
+      ctx.shadowBlur = 7;
+      ctx.shadowColor = "#ff8a45";
+      ctx.beginPath();
+      ctx.moveTo(vaneX - side * 3, 13);
+      ctx.lineTo(vaneX + side * 6, 20 + row * 2);
+      ctx.lineTo(vaneX + side * 2, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Manoeuvring upgrades add lateral attitude-control thrusters.
+    for (let i = 0; i < upgrades.maneuver; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      const thrusterX = side * (wingSpan - 5 - row * 7);
+      const thrusterY = 12 - row * 5;
+      ctx.fillStyle = "#c7fbff";
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = "#46e6ff";
+      ctx.fillRect(thrusterX - 1.5, thrusterY - 2, 3, 5);
+      ctx.strokeStyle = "rgba(70,230,255,.7)";
+      ctx.beginPath();
+      ctx.moveTo(thrusterX, thrusterY);
+      ctx.lineTo(thrusterX + side * 7, thrusterY - 1);
+      ctx.stroke();
+    }
+
+    // Armour upgrades layer heavy plates over the wing roots and spine.
+    for (let i = 0; i < upgrades.armor; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      ctx.fillStyle = "rgba(186, 205, 216, 0.88)";
+      ctx.strokeStyle = "rgba(239, 251, 255, 0.86)";
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = "#b8d5e3";
+      ctx.beginPath();
+      ctx.moveTo(side * (7 + row * 3), -13 + row * 8);
+      ctx.lineTo(side * (17 + row * 4), -2 + row * 7);
+      ctx.lineTo(side * (14 + row * 4), 5 + row * 6);
+      ctx.lineTo(side * (8 + row * 2), 1 + row * 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Regeneration upgrades route green nanite conduits through the hull.
+    for (let i = 0; i < upgrades.regeneration; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      ctx.strokeStyle = "#52ff9b";
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#52ff9b";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(side * (3 + row * 3), -4 + row * 5);
+      ctx.lineTo(side * (10 + row * 4), 7 + row * 4);
+      ctx.lineTo(side * (16 + row * 5), 9 + row * 3);
+      ctx.stroke();
+    }
+
     // Weapon-core upgrades permanently alter the ship's centreline.
     if (upgrades.plasma > 0) {
       ctx.fillStyle = "#c47aff";
@@ -1341,6 +1821,7 @@
       damage: [120, 45, 0.28, "square", 0.05],
       shield: [260, 620, 0.15, "sine", 0.025],
       upgrade: [290, 880, 0.32, "triangle", 0.035],
+      resource: [510, 740, 0.11, "sine", 0.022],
       switch: [330, 520, 0.06, "sine", 0.018],
     }[type];
     if (!settings) return;
@@ -1408,6 +1889,9 @@
   document.querySelectorAll(".weapon-slot").forEach((card) => {
     card.addEventListener("click", () => selectWeapon(card.dataset.weapon));
   });
+  document.querySelectorAll("[data-fabricate]").forEach((button) => {
+    button.addEventListener("click", () => fabricate(button.dataset.fabricate));
+  });
   ui.configButton.addEventListener("click", () => setConfigOpen(ui.configPopover.hidden));
   document.getElementById("closeConfigButton").addEventListener("click", () => setConfigOpen(false));
   ui.sound.addEventListener("click", () => {
@@ -1465,6 +1949,7 @@
   highScore = Number.isFinite(highScore) ? highScore : 0;
   ui.highScore.textContent = padScore(highScore);
   resize();
+  updateResourceUi();
   updateHud(true);
   requestAnimationFrame(frame);
 })();
