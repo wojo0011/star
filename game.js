@@ -16,6 +16,7 @@
     start: document.getElementById("startOverlay"),
     pause: document.getElementById("pauseOverlay"),
     gameOver: document.getElementById("gameOverOverlay"),
+    gameOverReason: document.getElementById("gameOverReason"),
     finalScore: document.getElementById("finalScore"),
     announcer: document.getElementById("announcer"),
     sound: document.getElementById("soundButton"),
@@ -114,12 +115,29 @@
   };
   const commonMetals = ["iron", "nickel", "copper", "aluminum", "magnesium", "cobalt", "chromium", "zinc"];
   const exoticMetals = Object.keys(resourceCatalog).filter((id) => !commonMetals.includes(id) && !["silver", "gold", "titanium", "beryllium"].includes(id));
+  const planetTypes = [
+    { id: "gas", name: "Gas giant", style: "gas", colors: ["#d39a61", "#efe0bc", "#985d72"], atmosphere: "#ffc980" },
+    { id: "rocky", name: "Rocky world", style: "rocky", colors: ["#8e7766", "#493b36", "#b99c7e"], atmosphere: "#c4aa8d" },
+    { id: "habitable", name: "Habitable world", style: "habitable", colors: ["#287cb7", "#2f9d65", "#d5f2ed"], atmosphere: "#69cfff" },
+    { id: "icy", name: "Icy world", style: "icy", colors: ["#bce7f4", "#eafcff", "#6eafcd"], atmosphere: "#a8efff" },
+    { id: "forest", name: "Forest world", style: "forest", colors: ["#235f42", "#4e9a52", "#a9c473"], atmosphere: "#78d5ac" },
+    { id: "ocean", name: "Ocean world", style: "ocean", colors: ["#0c4f94", "#2e9ec1", "#8de5ee"], atmosphere: "#59d8ff" },
+    { id: "desert", name: "Desert world", style: "desert", colors: ["#c77c3f", "#e2b66f", "#8b4d35"], atmosphere: "#e9b46d" },
+    { id: "volcanic", name: "Volcanic world", style: "volcanic", colors: ["#21191c", "#4b2929", "#ff5a24"], atmosphere: "#ff6338" },
+    { id: "toxic", name: "Toxic world", style: "toxic", colors: ["#76933e", "#b2c75b", "#354729"], atmosphere: "#b8e75e" },
+  ];
+  const alienShipTypes = [
+    { id: "scout", name: "Alien scout", radius: 23, hp: 4, speed: 82, score: 420, color: "#ff5d9e" },
+    { id: "raider", name: "Alien raider", radius: 29, hp: 7, speed: 66, score: 760, color: "#c86cff" },
+    { id: "gunship", name: "Alien gunship", radius: 36, hp: 11, speed: 48, score: 1250, color: "#ff7654" },
+  ];
 
   let width = window.innerWidth;
   let height = window.innerHeight;
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let lastTime = performance.now();
   let state = "idle";
+  let configReturnState = null;
   let score = 0;
   let highScore = Number(localStorage.getItem("starfall-high-score") || 0);
   let health = 100;
@@ -142,6 +160,13 @@
   let nextShootingStar = random(7, 12);
   let matterBalance = 0;
   let timeSinceDamage = 0;
+  let planetClock = 0;
+  let nextPlanet = random(24, 40);
+  let alienClock = 0;
+  let nextAlien = random(10, 17);
+  let stationClock = 0;
+  let nextStation = random(34, 55);
+  let hostileSequence = 0;
 
   const keys = new Set();
   const stars = [];
@@ -152,6 +177,10 @@
   const powerUps = [];
   const resourceDrops = [];
   const shootingStars = [];
+  const planets = [];
+  const alienShips = [];
+  const spaceStations = [];
+  const enemyProjectiles = [];
   const mobileVector = { x: 0, y: 0 };
   const resourceInventory = {};
   const upgrades = {
@@ -225,8 +254,16 @@
     toastTimer = 0;
     shootingStarClock = 0;
     nextShootingStar = random(7, 12);
+    planetClock = 0;
+    nextPlanet = random(24, 40);
+    alienClock = 0;
+    nextAlien = random(10, 17);
+    stationClock = 0;
+    nextStation = random(34, 55);
+    hostileSequence = 0;
     matterBalance = 0;
     timeSinceDamage = 0;
+    configReturnState = null;
     asteroids.length = 0;
     projectiles.length = 0;
     particles.length = 0;
@@ -234,6 +271,10 @@
     powerUps.length = 0;
     resourceDrops.length = 0;
     shootingStars.length = 0;
+    planets.length = 0;
+    alienShips.length = 0;
+    spaceStations.length = 0;
+    enemyProjectiles.length = 0;
     Object.keys(resourceInventory).forEach((key) => delete resourceInventory[key]);
     Object.keys(upgrades).forEach((key) => { upgrades[key] = 0; });
     unlockedWeapons.clear();
@@ -263,7 +304,7 @@
   }
 
   function togglePause(forceResume = false) {
-    if (state === "idle" || state === "gameover") return;
+    if (state === "idle" || state === "gameover" || state === "config") return;
     if (state === "paused" || forceResume) {
       state = "running";
       ui.pause.classList.remove("visible");
@@ -277,22 +318,37 @@
   }
 
   function setConfigOpen(open) {
+    if (open && ui.configPopover.hidden) {
+      configReturnState = state;
+      if (state === "running") state = "config";
+      ui.announcer.textContent = "Ship configuration open. Mission paused.";
+    } else if (!open && !ui.configPopover.hidden) {
+      if (state === "config") state = configReturnState === "running" ? "running" : configReturnState;
+      configReturnState = null;
+      lastTime = performance.now();
+      ui.announcer.textContent = state === "running" ? "Ship configuration closed. Mission resumed." : "Ship configuration closed.";
+    }
     ui.configPopover.hidden = !open;
     ui.configButton.classList.toggle("active", open);
     ui.configButton.setAttribute("aria-expanded", String(open));
     ui.configButton.setAttribute("aria-label", open ? "Hide ship configuration" : "Show ship configuration");
   }
 
-  function endGame() {
+  function endGame(reason = "HULL INTEGRITY FAILED") {
     state = "gameover";
+    configReturnState = null;
+    ui.configPopover.hidden = true;
+    ui.configButton.classList.remove("active");
+    ui.configButton.setAttribute("aria-expanded", "false");
     if (score > highScore) {
       highScore = score;
       localStorage.setItem("starfall-high-score", String(highScore));
     }
     ui.finalScore.textContent = padScore(score);
+    ui.gameOverReason.textContent = reason;
     ui.highScore.textContent = padScore(highScore);
     ui.gameOver.classList.add("visible");
-    ui.announcer.textContent = `Ship destroyed. Final score ${score}`;
+    ui.announcer.textContent = `${reason}. Final score ${score}`;
     playTone("explosion");
   }
 
@@ -804,7 +860,195 @@
     });
   }
 
+  function spawnPlanet() {
+    const type = planetTypes[Math.floor(Math.random() * planetTypes.length)];
+    const maxRadius = Math.max(58, Math.min(190, width * 0.23, height * 0.25));
+    let radius = random(maxRadius * 0.42, maxRadius);
+    if (type.style === "gas") radius = Math.min(maxRadius, radius * 1.15);
+    if (type.style === "rocky" && Math.random() < 0.5) radius *= 0.72;
+    const featureCount = Math.floor(random(8, 17));
+    const features = Array.from({ length: featureCount }, () => {
+      const angle = random(0, TAU);
+      const distance = Math.sqrt(Math.random()) * radius * 0.68;
+      return {
+        x: Math.cos(angle) * distance,
+        y: Math.sin(angle) * distance,
+        r: random(0.045, 0.16) * radius,
+        rotation: random(0, TAU),
+        tone: Math.floor(random(0, type.colors.length)),
+      };
+    });
+    planets.push({
+      type,
+      x: random(-radius * 0.1, width + radius * 0.1),
+      y: -radius - random(30, 110),
+      radius,
+      vy: random(19, 34),
+      rotation: random(0, TAU),
+      rotationSpeed: random(-0.035, 0.035),
+      features,
+      hasRings: type.style === "gas" && Math.random() < 0.42,
+      phase: random(0, TAU),
+    });
+    showUpgradeToast(type.name.toUpperCase(), "PLANETARY BODY DETECTED");
+  }
+
+  function rollHostileDefense(baseHp) {
+    const roll = Math.random();
+    if (roll < 0.34) return { defense: "none", armor: 0, hpBonus: 0, shield: 0 };
+    if (roll < 0.58) return { defense: "armored", armor: 0.28, hpBonus: Math.ceil(baseHp * 0.35), shield: 0 };
+    if (roll < 0.82) return { defense: "shielded", armor: 0, hpBonus: 0, shield: Math.ceil(baseHp * 0.75) };
+    return { defense: "fortified", armor: 0.2, hpBonus: Math.ceil(baseHp * 0.2), shield: Math.ceil(baseHp * 0.58) };
+  }
+
+  function spawnAlienShip() {
+    const wave = getWave();
+    const availableTypes = alienShipTypes.slice(0, wave >= 4 ? 3 : wave >= 2 ? 2 : 1);
+    const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+    const defense = rollHostileDefense(type.hp);
+    const maxHp = type.hp + defense.hpBonus + Math.floor((wave - 1) * 0.45);
+    const radius = type.radius;
+    alienShips.push({
+      id: `alien-${++hostileSequence}`,
+      kind: "ship",
+      type,
+      x: random(radius + 20, width - radius - 20),
+      y: -radius - 35,
+      baseX: 0,
+      targetY: random(135, Math.min(height * 0.46, 360)),
+      radius,
+      hp: maxHp,
+      maxHp,
+      shield: defense.shield,
+      shieldMax: defense.shield,
+      armor: defense.armor,
+      defense: defense.defense,
+      fireClock: random(0.15, 0.9),
+      fireDelay: random(2.05, 3.15),
+      phase: random(0, TAU),
+      life: random(17, 24),
+      flash: 0,
+      shieldFlash: 0,
+      score: type.score,
+    });
+    const enemy = alienShips[alienShips.length - 1];
+    enemy.baseX = enemy.x;
+    showUpgradeToast(`${type.name.toUpperCase()} · ${defense.defense.toUpperCase()}`, "HOSTILE CONTACT");
+  }
+
+  function spawnSpaceStation() {
+    const wave = getWave();
+    const baseHp = 18 + Math.floor(wave * 1.5);
+    const defense = rollHostileDefense(baseHp);
+    const maxHp = baseHp + defense.hpBonus;
+    const radius = random(52, 76);
+    const x = random(radius + 28, width - radius - 28);
+    spaceStations.push({
+      id: `station-${++hostileSequence}`,
+      kind: "station",
+      x,
+      y: -radius - 70,
+      baseX: x,
+      targetY: random(145, Math.min(height * 0.38, 290)),
+      radius,
+      hp: maxHp,
+      maxHp,
+      shield: defense.shield,
+      shieldMax: defense.shield,
+      armor: defense.armor,
+      defense: defense.defense,
+      fireClock: random(0.4, 1.2),
+      fireDelay: random(2.7, 3.7),
+      phase: random(0, TAU),
+      rotation: random(0, TAU),
+      life: random(25, 34),
+      flash: 0,
+      shieldFlash: 0,
+      score: 3200,
+    });
+    showUpgradeToast(`ORBITAL STATION · ${defense.defense.toUpperCase()}`, "HEAVY HOSTILE CONTACT");
+  }
+
+  function fireEnemyWeapon(hostile) {
+    const isStation = hostile.kind === "station";
+    const count = isStation ? (getWave() >= 4 ? 3 : 2) : 1;
+    const speed = isStation ? 205 : hostile.type.id === "scout" ? 255 : 225;
+    const baseAngle = Math.atan2(ship.y - hostile.y, ship.x - hostile.x);
+    for (let i = 0; i < count; i += 1) {
+      const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
+      const angle = baseAngle + ratio * (isStation ? 0.2 : 0.08);
+      enemyProjectiles.push({
+        x: hostile.x + Math.cos(angle) * hostile.radius * 0.45,
+        y: hostile.y + Math.sin(angle) * hostile.radius * 0.45,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: isStation ? 7 : 5,
+        damage: isStation ? 8 : hostile.type.id === "gunship" ? 11 : hostile.type.id === "raider" ? 9 : 7,
+        life: 5.5,
+        phase: random(0, TAU),
+        stationBolt: isStation,
+      });
+    }
+    createSparks(hostile.x, hostile.y + hostile.radius * 0.35, isStation ? 7 : 4, isStation ? "#ffb548" : hostile.type.color);
+    playTone("enemy");
+  }
+
+  function damageHostile(hostile, amount, projectileType) {
+    let remaining = amount;
+    if (hostile.shield > 0) {
+      const absorbed = Math.min(hostile.shield, remaining);
+      hostile.shield -= absorbed;
+      remaining -= absorbed;
+      hostile.shieldFlash = 0.18;
+      createSparks(hostile.x, hostile.y, 5, "#5ee8ff");
+      playTone("shield");
+    }
+    if (remaining > 0) {
+      hostile.hp -= remaining * (1 - hostile.armor);
+      hostile.flash = 0.1;
+      createSparks(hostile.x, hostile.y, projectileType === "missile" ? 11 : 5, hostile.kind === "station" ? "#ffb548" : hostile.type.color);
+    }
+    if (hostile.hp <= 0) destroyHostile(hostile);
+  }
+
+  function destroyHostile(hostile) {
+    const collection = hostile.kind === "station" ? spaceStations : alienShips;
+    const index = collection.indexOf(hostile);
+    if (index === -1) return;
+    collection.splice(index, 1);
+    score += hostile.score;
+    createExplosion(hostile.x, hostile.y, hostile.radius * 1.2, hostile.kind === "station" ? 2.5 : 1.5);
+    shockwaves.push({ x: hostile.x, y: hostile.y, radius: 4, maxRadius: hostile.radius * 2, life: 0.42, maxLife: 0.42, color: hostile.kind === "station" ? "#ffb548" : hostile.type.color });
+    screenShake = Math.max(screenShake, hostile.kind === "station" ? 10 : 5);
+    if (Math.random() < (hostile.kind === "station" ? 0.55 : 0.16)) spawnUpgrade(hostile.x, hostile.y);
+    playTone("explosion");
+  }
+
+  function updateHostile(hostile, dt) {
+    hostile.phase += dt;
+    hostile.flash = Math.max(0, hostile.flash - dt);
+    hostile.shieldFlash = Math.max(0, hostile.shieldFlash - dt);
+    if (hostile.kind === "station") hostile.rotation += dt * 0.24;
+    const entrySpeed = hostile.kind === "station" ? 28 : hostile.type.speed;
+    if (hostile.y < hostile.targetY) {
+      hostile.y = Math.min(hostile.targetY, hostile.y + entrySpeed * dt);
+    } else {
+      hostile.life -= dt;
+      const range = hostile.kind === "station" ? Math.min(70, width * 0.06) : Math.min(165, width * 0.15);
+      const frequency = hostile.kind === "station" ? 0.32 : 0.75 + hostile.type.speed * 0.002;
+      hostile.x = clamp(hostile.baseX + Math.sin(hostile.phase * frequency) * range, hostile.radius + 12, width - hostile.radius - 12);
+      if (hostile.life <= 0) hostile.y += (hostile.kind === "station" ? 38 : 105) * dt;
+    }
+    hostile.fireClock += dt;
+    if (hostile.life > 0 && hostile.y > 70 && hostile.fireClock >= hostile.fireDelay) {
+      hostile.fireClock = 0;
+      hostile.fireDelay *= random(0.92, 1.08);
+      fireEnemyWeapon(hostile);
+    }
+  }
+
   function update(dt, now) {
+    if (state === "paused" || state === "config") return;
     updateStars(dt);
     if (state !== "running") return;
 
@@ -819,6 +1063,24 @@
       shootingStarClock = 0;
       nextShootingStar = random(7, 13);
       spawnShootingStar();
+    }
+    planetClock += dt;
+    if (planetClock >= nextPlanet) {
+      planetClock = 0;
+      nextPlanet = random(27, 44);
+      spawnPlanet();
+    }
+    alienClock += dt;
+    if (alienClock >= nextAlien) {
+      alienClock = 0;
+      nextAlien = random(Math.max(7.5, 12.5 - getWave() * 0.35), Math.max(12, 19 - getWave() * 0.3));
+      spawnAlienShip();
+    }
+    stationClock += dt;
+    if (stationClock >= nextStation) {
+      stationClock = 0;
+      nextStation = random(38, 62);
+      spawnSpaceStation();
     }
     const wave = getWave();
     const spawnDelay = Math.max(0.48, 1.25 - (wave - 1) * 0.05);
@@ -861,12 +1123,12 @@
       if (projectile.type === "missile") {
         let target = null;
         let nearest = Infinity;
-        for (const asteroid of asteroids) {
-          if (asteroid.y >= projectile.y + 20) continue;
-          const d = distanceSq(projectile, asteroid);
+        for (const candidate of [...asteroids, ...alienShips, ...spaceStations]) {
+          if (candidate.y >= projectile.y + 20) continue;
+          const d = distanceSq(projectile, candidate);
           if (d < nearest) {
             nearest = d;
-            target = asteroid;
+            target = candidate;
           }
         }
         if (target) {
@@ -939,6 +1201,23 @@
           }
         }
       }
+      if (!projectiles.includes(projectile)) continue;
+      for (const hostile of [...alienShips, ...spaceStations]) {
+        if (projectile.hitIds.has(hostile.id)) continue;
+        const hitRadius = projectile.radius + hostile.radius * 0.76;
+        if (distanceSq(projectile, hostile) <= hitRadius * hitRadius) {
+          projectile.hitIds.add(hostile.id);
+          projectile.pierce -= 1;
+          damageHostile(hostile, projectile.damage, projectile.type);
+          if (projectile.type === "missile") {
+            shockwaves.push({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
+          }
+          if (projectile.pierce <= 0) {
+            projectiles.splice(i, 1);
+            break;
+          }
+        }
+      }
     }
 
     for (const asteroid of [...asteroids]) {
@@ -957,6 +1236,58 @@
       if (asteroid.y - asteroid.radius > height) {
         asteroids.splice(asteroids.indexOf(asteroid), 1);
       }
+    }
+
+    for (const planet of [...planets]) {
+      planet.y += planet.vy * dt;
+      planet.rotation += planet.rotationSpeed * dt;
+      planet.phase += dt;
+      const collisionRadius = planet.radius * 0.82 + ship.radius;
+      if (distanceSq(planet, ship) <= collisionRadius * collisionRadius) {
+        createExplosion(ship.x, ship.y, 62, 2.6);
+        screenShake = 18;
+        endGame("PLANETARY IMPACT");
+        return;
+      }
+      if (planet.y - planet.radius > height + 40) planets.splice(planets.indexOf(planet), 1);
+    }
+
+    for (const enemy of [...alienShips]) {
+      updateHostile(enemy, dt);
+      if (enemy.y - enemy.radius > height + 70) alienShips.splice(alienShips.indexOf(enemy), 1);
+    }
+    for (const station of [...spaceStations]) {
+      updateHostile(station, dt);
+      if (station.y - station.radius > height + 100) spaceStations.splice(spaceStations.indexOf(station), 1);
+    }
+
+    for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
+      const bolt = enemyProjectiles[i];
+      bolt.life -= dt;
+      bolt.phase += dt * 12;
+      bolt.x += bolt.vx * dt;
+      bolt.y += bolt.vy * dt;
+      if (Math.random() < dt * 18) {
+        particles.push({
+          x: bolt.x + random(-2, 2),
+          y: bolt.y + random(-2, 2),
+          vx: -bolt.vx * 0.08 + random(-12, 12),
+          vy: -bolt.vy * 0.08 + random(-12, 12),
+          life: 0.18,
+          maxLife: 0.18,
+          size: random(1, 2.4),
+          color: bolt.stationBolt ? "#ffb548" : "#ff4f9c",
+          drag: 0.94,
+        });
+      }
+      const collisionRadius = bolt.radius + ship.radius * 0.72;
+      if (distanceSq(bolt, ship) <= collisionRadius * collisionRadius) {
+        enemyProjectiles.splice(i, 1);
+        createSparks(bolt.x, bolt.y, 9, bolt.stationBolt ? "#ffb548" : "#ff4f9c");
+        damageShip(bolt.damage, bolt.x, bolt.y);
+        continue;
+      }
+      if (bolt.life <= 0 || bolt.y < -60 || bolt.y > height + 60 || bolt.x < -60 || bolt.x > width + 60) enemyProjectiles.splice(i, 1);
     }
 
     for (let i = powerUps.length - 1; i >= 0; i -= 1) {
@@ -1062,7 +1393,7 @@
     ui.healthBar.style.background = healthColor;
     ui.shield.textContent = shieldMax > 0 ? `${Math.round(shield)} / ${shieldMax}` : "OFFLINE";
     ui.shieldBar.style.width = `${shieldMax > 0 ? (shield / shieldMax) * 100 : 0}%`;
-    const contacts = asteroids.length + shootingStars.length;
+    const contacts = asteroids.length + shootingStars.length + planets.length + alienShips.length + spaceStations.length;
     ui.threats.textContent = `${contacts} ${contacts === 1 ? "CONTACT" : "CONTACTS"}`;
     if (forceRadar) updateRadar();
   }
@@ -1083,6 +1414,20 @@
       dot.style.top = `${clamp((star.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
     }
+    for (const planet of planets) {
+      const dot = document.createElement("i");
+      dot.className = "radar-dot planet-dot";
+      dot.style.left = `${clamp((planet.x / width) * 60 + 4, 3, 64)}px`;
+      dot.style.top = `${clamp((planet.y / height) * 54 + 4, 3, 57)}px`;
+      ui.radar.appendChild(dot);
+    }
+    for (const hostile of [...alienShips, ...spaceStations]) {
+      const dot = document.createElement("i");
+      dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : ""}`;
+      dot.style.left = `${clamp((hostile.x / width) * 60 + 4, 3, 64)}px`;
+      dot.style.top = `${clamp((hostile.y / height) * 54 + 4, 3, 57)}px`;
+      ui.radar.appendChild(dot);
+    }
   }
 
   function draw() {
@@ -1101,10 +1446,14 @@
     const shakeY = screenShake ? random(-screenShake, screenShake) : 0;
     ctx.translate(shakeX, shakeY);
     drawGuideLines();
+    for (const planet of planets) drawPlanet(planet);
     for (const star of shootingStars) drawShootingStar(star);
     for (const asteroid of asteroids) drawAsteroid(asteroid);
+    for (const station of spaceStations) drawSpaceStation(station);
+    for (const enemy of alienShips) drawAlienShip(enemy);
     for (const drop of resourceDrops) drawResourceDrop(drop);
     for (const pickup of powerUps) drawPowerUp(pickup);
+    for (const projectile of enemyProjectiles) drawEnemyProjectile(projectile);
     for (const projectile of projectiles) drawProjectile(projectile);
     drawEffects();
     if (state !== "gameover") drawShip();
@@ -1151,6 +1500,369 @@
       ctx.lineTo(x, height);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  function drawPlanet(planet) {
+    const { type, radius } = planet;
+    ctx.save();
+    ctx.translate(planet.x, planet.y);
+    ctx.rotate(planet.rotation);
+
+    if (planet.hasRings) {
+      ctx.save();
+      ctx.rotate(-0.22);
+      ctx.strokeStyle = "rgba(234, 205, 161, 0.34)";
+      ctx.lineWidth = Math.max(4, radius * 0.09);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.48, radius * 0.36, 0, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(121, 88, 79, 0.28)";
+      ctx.lineWidth = Math.max(2, radius * 0.035);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.68, radius * 0.42, 0, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TAU);
+    ctx.clip();
+
+    const surface = ctx.createRadialGradient(-radius * 0.34, -radius * 0.38, radius * 0.06, 0, 0, radius * 1.15);
+    surface.addColorStop(0, type.colors[1] || type.colors[0]);
+    surface.addColorStop(0.58, type.colors[0]);
+    surface.addColorStop(1, "#070b13");
+    ctx.fillStyle = surface;
+    ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+
+    if (type.style === "gas") {
+      for (let i = -6; i <= 6; i += 1) {
+        const y = i * radius * 0.145 + Math.sin(planet.phase * 0.16 + i) * radius * 0.025;
+        ctx.strokeStyle = i % 3 === 0 ? type.colors[2] : i % 2 === 0 ? type.colors[1] : "rgba(255,255,255,0.13)";
+        ctx.globalAlpha = 0.38 + (i % 2 === 0 ? 0.15 : 0);
+        ctx.lineWidth = radius * (i % 3 === 0 ? 0.09 : 0.055);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 1.05, y);
+        ctx.bezierCurveTo(-radius * 0.4, y + radius * 0.08, radius * 0.42, y - radius * 0.07, radius * 1.05, y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 0.56;
+      ctx.fillStyle = type.colors[2];
+      ctx.beginPath();
+      ctx.ellipse(radius * 0.24, radius * 0.2, radius * 0.22, radius * 0.1, -0.12, 0, TAU);
+      ctx.fill();
+    } else {
+      for (const feature of planet.features) {
+        ctx.save();
+        ctx.translate(feature.x, feature.y);
+        ctx.rotate(feature.rotation);
+        ctx.globalAlpha = type.style === "icy" ? 0.42 : 0.58;
+        ctx.fillStyle = type.colors[feature.tone] || type.colors[1];
+        ctx.beginPath();
+        ctx.ellipse(0, 0, feature.r * 1.25, feature.r * 0.7, 0, 0, TAU);
+        ctx.fill();
+        if (type.style === "rocky") {
+          ctx.strokeStyle = "rgba(20, 15, 16, 0.48)";
+          ctx.lineWidth = Math.max(1, feature.r * 0.14);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    if (["habitable", "forest", "ocean"].includes(type.style)) {
+      ctx.globalAlpha = 0.38;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = Math.max(2, radius * 0.035);
+      for (let i = -2; i <= 2; i += 1) {
+        const y = i * radius * 0.29 + Math.sin(planet.phase * 0.1 + i) * radius * 0.03;
+        ctx.beginPath();
+        ctx.arc(-radius * 0.12, y, radius * 0.58, 0.18, 2.72);
+        ctx.stroke();
+      }
+    }
+
+    if (type.style === "icy") {
+      ctx.strokeStyle = "rgba(50, 139, 180, 0.55)";
+      ctx.lineWidth = Math.max(1, radius * 0.018);
+      for (let i = 0; i < 5; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.8, -radius * 0.55 + i * radius * 0.28);
+        ctx.lineTo(-radius * 0.18, -radius * 0.28 + i * radius * 0.2);
+        ctx.lineTo(radius * 0.66, -radius * 0.5 + i * radius * 0.3);
+        ctx.stroke();
+      }
+    }
+
+    if (type.style === "volcanic") {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(255, 82, 31, 0.82)";
+      ctx.shadowColor = "#ff351d";
+      ctx.shadowBlur = radius * 0.1;
+      ctx.lineWidth = Math.max(2, radius * 0.025);
+      for (const feature of planet.features.slice(0, 7)) {
+        ctx.beginPath();
+        ctx.moveTo(feature.x * 0.3, feature.y * 0.3);
+        ctx.lineTo(feature.x, feature.y);
+        ctx.lineTo(feature.x + Math.cos(feature.rotation) * feature.r, feature.y + Math.sin(feature.rotation) * feature.r);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    const limb = ctx.createRadialGradient(-radius * 0.32, -radius * 0.36, radius * 0.18, radius * 0.36, radius * 0.35, radius * 1.2);
+    limb.addColorStop(0, "rgba(255,255,255,0.12)");
+    limb.addColorStop(0.56, "rgba(0,0,0,0.02)");
+    limb.addColorStop(1, "rgba(0,0,0,0.82)");
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = limb;
+    ctx.fillRect(-radius, -radius, radius * 2, radius * 2);
+    ctx.restore();
+
+    ctx.strokeStyle = type.atmosphere;
+    ctx.globalAlpha = 0.66;
+    ctx.lineWidth = Math.max(2, radius * 0.025);
+    ctx.shadowBlur = Math.min(24, radius * 0.18);
+    ctx.shadowColor = type.atmosphere;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius + 1, 0, TAU);
+    ctx.stroke();
+
+    if (planet.hasRings) {
+      ctx.save();
+      ctx.rotate(-0.22);
+      ctx.globalAlpha = 0.72;
+      ctx.strokeStyle = "#d7b98d";
+      ctx.lineWidth = Math.max(3, radius * 0.055);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, radius * 1.48, radius * 0.36, 0, 0.03, Math.PI - 0.03);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function drawHostileStatus(hostile) {
+    const width = hostile.radius * 1.55;
+    const y = -hostile.radius - 12;
+    ctx.save();
+    ctx.rotate(hostile.kind === "station" ? -hostile.rotation : 0);
+    ctx.fillStyle = "rgba(1, 5, 12, 0.82)";
+    ctx.fillRect(-width / 2, y, width, 4);
+    ctx.fillStyle = hostile.kind === "station" ? "#ffb548" : hostile.type.color;
+    ctx.fillRect(-width / 2, y, width * clamp(hostile.hp / hostile.maxHp, 0, 1), 4);
+    if (hostile.shieldMax > 0) {
+      ctx.fillStyle = "rgba(1, 5, 12, 0.82)";
+      ctx.fillRect(-width / 2, y - 6, width, 3);
+      ctx.fillStyle = "#59e6ff";
+      ctx.fillRect(-width / 2, y - 6, width * clamp(hostile.shield / hostile.shieldMax, 0, 1), 3);
+    }
+    ctx.font = "700 7px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = hostile.armor > 0 ? "#dbe5ed" : "rgba(255,255,255,.62)";
+    ctx.fillText(hostile.defense === "none" ? "UNPROTECTED" : hostile.defense.toUpperCase(), 0, y - (hostile.shieldMax > 0 ? 10 : 4));
+    ctx.restore();
+  }
+
+  function drawAlienShip(enemy) {
+    const r = enemy.radius;
+    const color = enemy.type.color;
+    ctx.save();
+    ctx.translate(enemy.x, enemy.y);
+    ctx.rotate(Math.sin(enemy.phase * 1.4) * 0.06);
+
+    if (enemy.shieldMax > 0 && enemy.shield > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = enemy.shieldFlash > 0 ? 0.92 : 0.2 + Math.sin(enemy.phase * 4) * 0.05;
+      ctx.strokeStyle = "#5de9ff";
+      ctx.fillStyle = "rgba(66, 205, 255, 0.05)";
+      ctx.lineWidth = enemy.shieldFlash > 0 ? 3 : 1.2;
+      ctx.shadowBlur = enemy.shieldFlash > 0 ? 26 : 12;
+      ctx.shadowColor = "#5de9ff";
+      ctx.beginPath();
+      ctx.ellipse(0, 1, r * 1.15, r * 1.02, 0, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = color;
+    ctx.strokeStyle = enemy.flash > 0 ? "#ffffff" : color;
+    ctx.lineWidth = 1.5;
+    const hull = ctx.createLinearGradient(0, -r, 0, r);
+    hull.addColorStop(0, "#2a193d");
+    hull.addColorStop(0.52, enemy.flash > 0 ? "#ffffff" : "#67427f");
+    hull.addColorStop(1, "#110b1b");
+    ctx.fillStyle = hull;
+    ctx.beginPath();
+    ctx.moveTo(0, r);
+    ctx.lineTo(r * 0.34, r * 0.36);
+    ctx.lineTo(r * 1.06, r * 0.12);
+    ctx.lineTo(r * 0.72, -r * 0.2);
+    ctx.lineTo(r * 0.9, -r * 0.72);
+    ctx.lineTo(r * 0.22, -r * 0.46);
+    ctx.lineTo(0, -r * 0.82);
+    ctx.lineTo(-r * 0.22, -r * 0.46);
+    ctx.lineTo(-r * 0.9, -r * 0.72);
+    ctx.lineTo(-r * 0.72, -r * 0.2);
+    ctx.lineTo(-r * 1.06, r * 0.12);
+    ctx.lineTo(-r * 0.34, r * 0.36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#160a24";
+    ctx.strokeStyle = "rgba(255,255,255,.2)";
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.72);
+    ctx.lineTo(r * 0.2, -r * 0.22);
+    ctx.lineTo(0, -r * 0.6);
+    ctx.lineTo(-r * 0.2, -r * 0.22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    const core = ctx.createRadialGradient(-r * 0.08, 0, 0, 0, r * 0.06, r * 0.32);
+    core.addColorStop(0, "#ffffff");
+    core.addColorStop(0.3, color);
+    core.addColorStop(1, "rgba(255, 44, 153, 0)");
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(0, r * 0.08, r * 0.32, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    if (enemy.armor > 0) {
+      ctx.fillStyle = "#aab5c4";
+      ctx.strokeStyle = "#eff8ff";
+      ctx.lineWidth = 1;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(side * r * 0.38, r * 0.26);
+        ctx.lineTo(side * r * 0.82, 0);
+        ctx.lineTo(side * r * 0.7, -r * 0.23);
+        ctx.lineTo(side * r * 0.31, -r * 0.05);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = color;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
+    for (const x of [-r * 0.33, r * 0.33]) {
+      ctx.beginPath();
+      ctx.ellipse(x, -r * 0.48, r * 0.09, r * (0.22 + Math.sin(enemy.phase * 9) * 0.035), 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    drawHostileStatus(enemy);
+    ctx.restore();
+  }
+
+  function drawSpaceStation(station) {
+    const r = station.radius;
+    ctx.save();
+    ctx.translate(station.x, station.y);
+
+    if (station.shieldMax > 0 && station.shield > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = station.shieldFlash > 0 ? 0.95 : 0.2 + Math.sin(station.phase * 3) * 0.04;
+      ctx.strokeStyle = "#5de9ff";
+      ctx.fillStyle = "rgba(66, 205, 255, 0.045)";
+      ctx.lineWidth = station.shieldFlash > 0 ? 4 : 1.5;
+      ctx.shadowBlur = station.shieldFlash > 0 ? 30 : 15;
+      ctx.shadowColor = "#5de9ff";
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.18, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.rotate(station.rotation);
+    ctx.strokeStyle = station.flash > 0 ? "#ffffff" : "#ffb548";
+    ctx.fillStyle = "rgba(50, 31, 42, 0.94)";
+    ctx.lineWidth = Math.max(2, r * 0.035);
+    ctx.shadowBlur = 16;
+    ctx.shadowColor = "#ff7a45";
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.76, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.48, 0, TAU);
+    ctx.stroke();
+
+    for (let i = 0; i < 6; i += 1) {
+      ctx.save();
+      ctx.rotate((i / 6) * TAU);
+      ctx.fillStyle = station.armor > 0 ? "#aeb9c7" : "#3d2d49";
+      ctx.strokeStyle = station.armor > 0 ? "#eef7ff" : "#ff9b59";
+      ctx.fillRect(r * 0.34, -r * 0.1, r * 0.62, r * 0.2);
+      ctx.strokeRect(r * 0.34, -r * 0.1, r * 0.62, r * 0.2);
+      ctx.fillStyle = "#ff6a4a";
+      ctx.shadowBlur = 9;
+      ctx.shadowColor = "#ff3f57";
+      ctx.beginPath();
+      ctx.arc(r * 0.94, 0, r * 0.085, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    const core = ctx.createRadialGradient(-r * 0.12, -r * 0.14, 0, 0, 0, r * 0.48);
+    core.addColorStop(0, "#ffffff");
+    core.addColorStop(0.22, "#ffca6d");
+    core.addColorStop(0.58, "#e64b5f");
+    core.addColorStop(1, "rgba(70, 8, 35, 0)");
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.48, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(255, 225, 190, 0.65)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.28, 0, TAU);
+    ctx.stroke();
+    drawHostileStatus(station);
+    ctx.restore();
+  }
+
+  function drawEnemyProjectile(bolt) {
+    ctx.save();
+    ctx.translate(bolt.x, bolt.y);
+    ctx.rotate(Math.atan2(bolt.vy, bolt.vx));
+    ctx.globalCompositeOperation = "lighter";
+    const color = bolt.stationBolt ? "#ffb548" : "#ff4f9c";
+    ctx.shadowBlur = bolt.stationBolt ? 22 : 16;
+    ctx.shadowColor = color;
+    const trail = ctx.createLinearGradient(-28, 0, bolt.radius, 0);
+    trail.addColorStop(0, "rgba(255, 44, 130, 0)");
+    trail.addColorStop(0.65, color);
+    trail.addColorStop(1, "#ffffff");
+    ctx.strokeStyle = trail;
+    ctx.lineWidth = bolt.stationBolt ? 4 : 3;
+    ctx.beginPath();
+    ctx.moveTo(-28, 0);
+    ctx.lineTo(bolt.radius, 0);
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(0, 0, bolt.radius * (0.65 + Math.sin(bolt.phase) * 0.08), 0, TAU);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -1823,6 +2535,7 @@
       upgrade: [290, 880, 0.32, "triangle", 0.035],
       resource: [510, 740, 0.11, "sine", 0.022],
       switch: [330, 520, 0.06, "sine", 0.018],
+      enemy: [210, 118, 0.14, "sawtooth", 0.022],
     }[type];
     if (!settings) return;
     const [start, end, duration, shape, volume] = settings;
@@ -1855,6 +2568,11 @@
 
   window.addEventListener("keydown", (event) => {
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(event.code)) event.preventDefault();
+    if (event.code === "Tab" && !event.repeat) {
+      event.preventDefault();
+      if (state !== "gameover") setConfigOpen(ui.configPopover.hidden);
+      return;
+    }
     if ((event.code === "AltLeft" || event.code === "AltRight" || event.key === "Meta") && !event.repeat) {
       event.preventDefault();
       if (state === "running") switchWeapon();
