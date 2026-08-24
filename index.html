@@ -57,6 +57,7 @@
         </div>
 
         <div class="hud-actions">
+          <button id="configButton" class="icon-button" type="button" aria-label="Show ship configuration" aria-expanded="false">CFG</button>
           <button id="soundButton" class="icon-button" type="button" aria-label="Toggle sound">SFX</button>
           <button id="pauseButton" class="icon-button" type="button" aria-label="Pause game">Ⅱ</button>
         </div>
@@ -68,33 +69,29 @@
         <span></span>
       </div>
 
-      <section class="hud weapon-panel" aria-label="Weapon selection">
-        <p class="eyebrow">WEAPON SYSTEM</p>
-        <button class="weapon-card active" data-weapon="laser" type="button">
-          <span class="weapon-icon laser-icon" aria-hidden="true"></span>
-          <span><b>PHOTON LASER</b><small>Rapid fire · 1 DMG</small></span>
-          <em>01</em>
-        </button>
-        <button class="weapon-card" data-weapon="missile" type="button">
-          <span class="weapon-icon missile-icon" aria-hidden="true"></span>
-          <span><b>SEEKER MISSILE</b><small>Homing · 3 DMG</small></span>
-          <em>02</em>
-        </button>
-        <button class="weapon-card locked" data-weapon="plasma" type="button" disabled>
-          <span class="weapon-icon plasma-icon" aria-hidden="true"></span>
-          <span><b>PLASMA CANNON</b><small>LOCKED · FIND CORE</small></span>
-          <em>03</em>
-        </button>
-        <button class="weapon-card locked" data-weapon="railgun" type="button" disabled>
-          <span class="weapon-icon rail-icon" aria-hidden="true"></span>
-          <span><b>RAIL DRIVER</b><small>LOCKED · FIND CORE</small></span>
-          <em>04</em>
-        </button>
-        <p class="switch-hint"><kbd>ALT</kbd> / <kbd>⌘</kbd> SWITCH</p>
+      <section class="hud weapon-dock" aria-label="Weapon selection">
+        <div class="active-weapon">
+          <span id="activeWeaponIcon" class="weapon-icon laser-icon" aria-hidden="true"></span>
+          <span>
+            <small>ACTIVE WEAPON</small>
+            <strong id="activeWeaponName">PHOTON LASER</strong>
+            <em id="activeWeaponStats">Rapid fire · 1 DMG</em>
+          </span>
+        </div>
+        <div class="weapon-slots" aria-label="Unlocked weapons">
+          <button class="weapon-slot active" data-weapon="laser" type="button" aria-label="Select photon laser">1</button>
+          <button class="weapon-slot" data-weapon="missile" type="button" aria-label="Select seeker missile" hidden disabled>2</button>
+          <button class="weapon-slot" data-weapon="plasma" type="button" aria-label="Select plasma cannon" hidden disabled>3</button>
+          <button class="weapon-slot" data-weapon="railgun" type="button" aria-label="Select rail driver" hidden disabled>4</button>
+          <span class="switch-compact"><kbd>ALT</kbd> SWITCH</span>
+        </div>
       </section>
 
-      <section class="hud upgrade-panel" aria-label="Installed ship upgrades">
-        <p class="eyebrow">SHIP CONFIGURATION</p>
+      <section id="configPopover" class="hud config-popover" aria-label="Installed ship upgrades" hidden>
+        <div class="config-heading">
+          <p class="eyebrow">SHIP CONFIGURATION</p>
+          <button id="closeConfigButton" type="button" aria-label="Close ship configuration">×</button>
+        </div>
         <div id="upgradeList" class="upgrade-list">
           <span class="empty-upgrades">NO UPGRADES INSTALLED</span>
         </div>
@@ -126,7 +123,7 @@
       <section id="startOverlay" class="game-overlay visible" aria-labelledby="startTitle">
         <div class="overlay-kicker"><span></span> FLIGHT SYSTEM READY <span></span></div>
         <h2 id="startTitle">ENTER THE<br /><em>STARFALL</em></h2>
-        <p>Survive the asteroid storm and recover upgrade cores.<br />Missed asteroids pass safely—only direct collisions damage your ship.</p>
+        <p>Launch with a basic laser, then recover weapons and upgrades in the field.<br />Missed asteroids pass safely—only direct collisions damage your ship.</p>
         <button id="startButton" class="primary-button" type="button">
           <span>LAUNCH MISSION</span>
           <small>PRESS SPACE</small>
