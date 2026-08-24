@@ -22,6 +22,11 @@
     upgradeList: document.getElementById("upgradeList"),
     upgradeToast: document.getElementById("upgradeToast"),
     upgradeToastTitle: document.getElementById("upgradeToastTitle"),
+    activeWeaponIcon: document.getElementById("activeWeaponIcon"),
+    activeWeaponName: document.getElementById("activeWeaponName"),
+    activeWeaponStats: document.getElementById("activeWeaponStats"),
+    configButton: document.getElementById("configButton"),
+    configPopover: document.getElementById("configPopover"),
   };
 
   const TAU = Math.PI * 2;
@@ -72,10 +77,11 @@
     fireRate: 0,
     wideShot: 0,
     shield: 0,
+    missile: 0,
     plasma: 0,
     railgun: 0,
   };
-  const unlockedWeapons = new Set(["laser", "missile"]);
+  const unlockedWeapons = new Set(["laser"]);
 
   const ship = {
     x: width / 2,
@@ -139,7 +145,6 @@
     Object.keys(upgrades).forEach((key) => { upgrades[key] = 0; });
     unlockedWeapons.clear();
     unlockedWeapons.add("laser");
-    unlockedWeapons.add("missile");
     ship.x = width / 2;
     ship.y = height * 0.82;
     ship.vx = 0;
@@ -158,6 +163,7 @@
     ui.start.classList.remove("visible");
     ui.pause.classList.remove("visible");
     ui.gameOver.classList.remove("visible");
+    setConfigOpen(false);
     ui.announcer.textContent = "Mission launched";
     lastTime = performance.now();
   }
@@ -176,6 +182,13 @@
     }
   }
 
+  function setConfigOpen(open) {
+    ui.configPopover.hidden = !open;
+    ui.configButton.classList.toggle("active", open);
+    ui.configButton.setAttribute("aria-expanded", String(open));
+    ui.configButton.setAttribute("aria-label", open ? "Hide ship configuration" : "Show ship configuration");
+  }
+
   function endGame() {
     state = "gameover";
     if (score > highScore) {
@@ -192,17 +205,16 @@
   function selectWeapon(next, announce = true) {
     if (!unlockedWeapons.has(next)) return;
     weapon = next;
-    document.querySelectorAll(".weapon-card").forEach((card) => {
+    document.querySelectorAll(".weapon-slot").forEach((card) => {
       const unlocked = unlockedWeapons.has(card.dataset.weapon);
       card.classList.toggle("active", card.dataset.weapon === weapon);
-      card.classList.toggle("locked", !unlocked);
       card.disabled = !unlocked;
+      card.hidden = !unlocked;
       card.setAttribute("aria-pressed", String(card.dataset.weapon === weapon));
-      const description = card.querySelector("small");
-      if (description) description.textContent = unlocked
-        ? weaponDefinitions[card.dataset.weapon].description
-        : "LOCKED · FIND CORE";
     });
+    ui.activeWeaponName.textContent = weaponDefinitions[weapon].name.toUpperCase();
+    ui.activeWeaponStats.textContent = weaponDefinitions[weapon].description;
+    ui.activeWeaponIcon.className = `weapon-icon ${weapon === "railgun" ? "rail-icon" : `${weapon}-icon`}`;
     if (announce) {
       ui.announcer.textContent = `${weaponDefinitions[weapon].name} selected`;
       playTone("switch");
@@ -284,7 +296,8 @@
       }
       playTone("laser");
     } else if (weapon === "missile") {
-      const count = 1 + Math.floor(wide / 2);
+      const level = Math.max(1, upgrades.missile);
+      const count = 1 + Math.floor(wide / 2) + (level >= 3 ? 1 : 0);
       for (let i = 0; i < count; i += 1) {
         const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
         projectiles.push({
@@ -294,7 +307,7 @@
           vx: ratio * 100,
           vy: -355,
           radius: 6,
-          damage: 3,
+          damage: 2 + level,
           life: 3.6,
           trailClock: 0,
           pierce: 1,
@@ -378,7 +391,11 @@
       score += asteroid.score;
       destroyedCount += 1;
       const dropChance = asteroid.type === "large" ? 0.34 : asteroid.type === "medium" ? 0.17 : 0.08;
-      if (Math.random() < dropChance || destroyedCount % 12 === 0) spawnUpgrade(asteroid.x, asteroid.y);
+      if (destroyedCount === 5 && unlockedWeapons.size === 1) {
+        spawnUpgrade(asteroid.x, asteroid.y, "missile");
+      } else if (Math.random() < dropChance || destroyedCount % 12 === 0) {
+        spawnUpgrade(asteroid.x, asteroid.y);
+      }
       if (cause === "missile") {
         for (const nearby of [...asteroids]) {
           const blast = asteroid.radius + 66;
@@ -389,15 +406,16 @@
     playTone("impact", strength);
   }
 
-  function spawnUpgrade(x, y) {
+  function spawnUpgrade(x, y, preferredType = null) {
     const candidates = [];
     if (upgrades.fireRate < 5) candidates.push("fireRate", "fireRate");
     if (upgrades.wideShot < 4) candidates.push("wideShot", "wideShot");
     if (upgrades.shield < 4 || shield < shieldMax) candidates.push("shield", "shield");
+    if (upgrades.missile < 3) candidates.push("missile", "missile");
     if (upgrades.plasma < 3) candidates.push("plasma");
     if (upgrades.railgun < 3) candidates.push("railgun");
     if (!candidates.length) candidates.push("shield");
-    const type = candidates[Math.floor(Math.random() * candidates.length)];
+    const type = preferredType || candidates[Math.floor(Math.random() * candidates.length)];
     powerUps.push({
       type,
       x,
@@ -423,6 +441,10 @@
       shieldMax = Math.min(110, 35 + (upgrades.shield - 1) * 25);
       shield = shieldMax;
       label = upgrades.shield === 1 ? "DEFLECTOR SHIELD ONLINE" : `SHIELD ARRAY MK ${upgrades.shield}`;
+    } else if (type === "missile") {
+      upgrades.missile = Math.min(3, upgrades.missile + 1);
+      unlockedWeapons.add("missile");
+      label = upgrades.missile === 1 ? "SEEKER MISSILES UNLOCKED" : `SEEKER MISSILES MK ${upgrades.missile}`;
     } else if (type === "plasma") {
       upgrades.plasma = Math.min(3, upgrades.plasma + 1);
       unlockedWeapons.add("plasma");
@@ -453,6 +475,7 @@
     if (upgrades.fireRate) chips.push(`<span class="upgrade-chip">OVERDRIVE ${upgrades.fireRate}</span>`);
     if (upgrades.wideShot) chips.push(`<span class="upgrade-chip">WIDE ${upgrades.wideShot}</span>`);
     if (upgrades.shield) chips.push(`<span class="upgrade-chip shield">SHIELD ${Math.round(shield)}/${shieldMax}</span>`);
+    if (upgrades.missile) chips.push(`<span class="upgrade-chip weapon">MISSILE ${upgrades.missile}</span>`);
     if (upgrades.plasma) chips.push(`<span class="upgrade-chip weapon">PLASMA ${upgrades.plasma}</span>`);
     if (upgrades.railgun) chips.push(`<span class="upgrade-chip weapon">RAIL ${upgrades.railgun}</span>`);
     ui.upgradeList.innerHTML = chips.length ? chips.join("") : '<span class="empty-upgrades">NO UPGRADES INSTALLED</span>';
@@ -942,10 +965,11 @@
       fireRate: "#ff9f45",
       wideShot: "#56f4ff",
       shield: "#63b8ff",
+      missile: "#ff8345",
       plasma: "#b56cff",
       railgun: "#ffe36e",
     };
-    const glyphs = { fireRate: "F", wideShot: "W", shield: "S", plasma: "P", railgun: "R" };
+    const glyphs = { fireRate: "F", wideShot: "W", shield: "S", missile: "M", plasma: "P", railgun: "R" };
     const color = colors[pickup.type];
     const pulse = 1 + Math.sin(pickup.phase * 2) * 0.1;
     ctx.save();
@@ -1014,7 +1038,7 @@
     ctx.translate(ship.x, ship.y);
     if (ship.invulnerable > 0 && Math.floor(ship.invulnerable * 16) % 2 === 0) ctx.globalAlpha = 0.38;
 
-    const totalTier = upgrades.fireRate + upgrades.wideShot + upgrades.shield + upgrades.plasma + upgrades.railgun;
+    const totalTier = upgrades.fireRate + upgrades.wideShot + upgrades.shield + upgrades.missile + upgrades.plasma + upgrades.railgun;
     const wingSpan = 31 + upgrades.wideShot * 3 + Math.min(4, totalTier * 0.25);
     const shieldRadius = 39 + upgrades.shield * 3;
     const weaponColor = { laser: "#56f4ff", missile: "#ff8345", plasma: "#b56cff", railgun: "#ffe36e" }[weapon];
@@ -1194,20 +1218,23 @@
     ctx.quadraticCurveTo(1, -17, 2, -10);
     ctx.stroke();
 
-    // Standard missile pods remain visible on both wings.
-    for (const side of [-1, 1]) {
-      const podX = side * (wingSpan - 7);
-      ctx.shadowBlur = 4;
-      ctx.fillStyle = "#121d27";
-      ctx.strokeStyle = "#718c99";
-      ctx.fillRect(podX - 4, 8, 8, 10);
-      ctx.strokeRect(podX - 4, 8, 8, 10);
-      ctx.fillStyle = "#ff7541";
-      ctx.shadowColor = "#ff7541";
-      ctx.beginPath();
-      ctx.arc(podX - 1.7, 11, 1.2, 0, TAU);
-      ctx.arc(podX + 1.7, 11, 1.2, 0, TAU);
-      ctx.fill();
+    // Missile pickups install visible pods and additional launch tubes.
+    if (upgrades.missile > 0) {
+      for (const side of [-1, 1]) {
+        const podX = side * (wingSpan - 7);
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = "#121d27";
+        ctx.strokeStyle = "#718c99";
+        ctx.fillRect(podX - 4, 7, 8, 12);
+        ctx.strokeRect(podX - 4, 7, 8, 12);
+        ctx.fillStyle = "#ff7541";
+        ctx.shadowColor = "#ff7541";
+        ctx.beginPath();
+        for (let tube = 0; tube < upgrades.missile; tube += 1) {
+          ctx.arc(podX + (tube - (upgrades.missile - 1) / 2) * 2.4, 11, 1, 0, TAU);
+        }
+        ctx.fill();
+      }
     }
 
     // Wide-shot levels install visible outboard cannon hardpoints.
@@ -1364,8 +1391,9 @@
       startGame();
       return;
     }
-    if (event.code === "Escape" && state === "paused") {
-      togglePause(true);
+    if (event.code === "Escape") {
+      if (!ui.configPopover.hidden) setConfigOpen(false);
+      else if (state === "paused") togglePause(true);
       return;
     }
     keys.add(event.code);
@@ -1377,9 +1405,11 @@
   document.getElementById("restartButton").addEventListener("click", startGame);
   document.getElementById("resumeButton").addEventListener("click", () => togglePause(true));
   document.getElementById("pauseButton").addEventListener("click", () => togglePause());
-  document.querySelectorAll(".weapon-card").forEach((card) => {
+  document.querySelectorAll(".weapon-slot").forEach((card) => {
     card.addEventListener("click", () => selectWeapon(card.dataset.weapon));
   });
+  ui.configButton.addEventListener("click", () => setConfigOpen(ui.configPopover.hidden));
+  document.getElementById("closeConfigButton").addEventListener("click", () => setConfigOpen(false));
   ui.sound.addEventListener("click", () => {
     unlockAudio();
     soundEnabled = !soundEnabled;
