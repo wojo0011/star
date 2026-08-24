@@ -8,6 +8,7 @@ A fast, responsive browser-based space shooter built with the Canvas API.
 - Fire with **Space**.
 - Switch between unlocked weapons with **Alt** or **Command** on macOS.
 - Pause with **P**.
+- Open ship upgrades with **Tab**. Opening the CFG panel pauses the mission until it is closed.
 - Touch controls appear automatically on small screens.
 
 Asteroids vary in size, speed, and durability. Missed asteroids leave the battlefield safely—only direct collisions damage the ship. Every mission begins with the photon laser; all other weapons must be recovered as glowing pickups in the asteroid field.
@@ -17,6 +18,10 @@ Most asteroids are ordinary rock and drop nothing. Rarer asteroids visibly conta
 Open **CFG** to view discovered elements and spend refined matter in the field fabricator. Fabrication supports fire rate, wide shot, shielding, hull repair, engine thrust, manoeuvring response, armour plating, and passive hull regeneration.
 
 Fast diagonal shooting stars occasionally cross the battlefield. Contact damages the ship, but shooting stars that leave the screen cause no damage.
+
+Rare planets also drift through the sector in varied sizes. Gas giants, rocky worlds, habitable planets, icy worlds, forest planets, ocean planets, deserts, volcanic worlds, and toxic planets each have a distinct appearance. They can be safely avoided, but a direct planetary collision is an immediate game over.
+
+Hostile alien scouts, raiders, and gunships enter the field, maneuver across the upper sector, and fire aimed energy bolts at the player. Rarer orbital stations act as large rotating gun platforms. Hostiles may be unprotected, armored, shielded, or fortified with both defenses; armor reduces incoming damage while shields must be depleted before the hull can be hit. Their defense state is visible on the craft and in the status bars above it.
 
 Destroyed asteroids can release permanent upgrades for the current mission:
 
