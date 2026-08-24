@@ -90,6 +90,7 @@
       <section id="configPopover" class="hud config-popover" aria-label="Installed ship upgrades" hidden>
         <div class="config-heading">
           <p class="eyebrow">SHIP CONFIGURATION</p>
+          <span class="config-shortcut"><kbd>TAB</kbd> CLOSE</span>
           <button id="closeConfigButton" type="button" aria-label="Close ship configuration">×</button>
         </div>
         <div id="upgradeList" class="upgrade-list">
@@ -132,20 +133,21 @@
         <div>
           <p class="eyebrow">PROXIMITY RADAR</p>
           <strong id="threatCount">0 CONTACTS</strong>
-          <small>ASTEROID FIELD</small>
+          <small>SECTOR CONTACTS</small>
         </div>
       </section>
 
       <div class="controls-tip" aria-label="Keyboard controls">
         <span><kbd>WASD</kbd> / <kbd>ARROWS</kbd> MOVE</span>
         <span><kbd>SPACE</kbd> FIRE</span>
+        <span><kbd>TAB</kbd> UPGRADES</span>
         <span><kbd>P</kbd> PAUSE</span>
       </div>
 
       <section id="startOverlay" class="game-overlay visible" aria-labelledby="startTitle">
         <div class="overlay-kicker"><span></span> FLIGHT SYSTEM READY <span></span></div>
         <h2 id="startTitle">ENTER THE<br /><em>STARFALL</em></h2>
-        <p>Recover weapons, elemental resources and ship upgrades in the field.<br />Only direct collisions with asteroids or shooting stars damage your ship.</p>
+        <p>Recover weapons, elemental resources and ship upgrades in the field.<br />Evade alien fire and natural hazards. Planetary collisions are fatal.</p>
         <button id="startButton" class="primary-button" type="button">
           <span>LAUNCH MISSION</span>
           <small>PRESS SPACE</small>
@@ -162,6 +164,7 @@
       <section id="gameOverOverlay" class="game-overlay" aria-labelledby="gameOverTitle">
         <div class="overlay-kicker danger"><span></span> SIGNAL LOST <span></span></div>
         <h2 id="gameOverTitle">SHIP <em>DESTROYED</em></h2>
+        <p id="gameOverReason" class="game-over-reason">HULL INTEGRITY FAILED</p>
         <div class="final-score"><span>FINAL SCORE</span><strong id="finalScore">000000</strong></div>
         <button id="restartButton" class="primary-button" type="button">RELAUNCH</button>
       </section>
