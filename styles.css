@@ -765,6 +765,42 @@ button {
   cursor: pointer;
 }
 
+.audio-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 181, 72, 0.28);
+  background: rgba(255, 181, 72, 0.05);
+  color: #c9a96f;
+  font: 800 0.46rem ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+
+.audio-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.audio-status[data-state="playing"] {
+  border-color: rgba(86, 244, 255, 0.42);
+  color: var(--cyan);
+}
+
+.audio-status[data-state="ready"] {
+  border-color: rgba(82, 255, 155, 0.35);
+  color: #52ff9b;
+}
+
+.audio-status[data-state="muted"] {
+  border-color: rgba(255, 63, 87, 0.34);
+  color: var(--danger);
+}
+
 .test-audio-button:hover,
 .test-audio-button:focus-visible {
   outline: none;
