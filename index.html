@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#030611" />
+    <meta
+      name="description"
+      content="Starfall Command — pilot a strike ship, dodge the asteroid field, and fight back with lasers and missiles."
+    />
+    <title>Starfall Command</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Starfall Command space shooter">
+      <canvas id="gameCanvas" aria-label="Space shooter game area"></canvas>
+
+      <header class="hud hud-top" aria-label="Mission status">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true"><span></span></div>
+          <div>
+            <p class="eyebrow">STRIKE GROUP 07</p>
+            <h1>STARFALL <span>COMMAND</span></h1>
+          </div>
+        </div>
+
+        <div class="mission-stats">
+          <div class="stat-block">
+            <span>SCORE</span>
+            <strong id="scoreValue">000000</strong>
+          </div>
+          <div class="stat-block">
+            <span>HIGH SCORE</span>
+            <strong id="highScoreValue">000000</strong>
+          </div>
+          <div class="stat-block stat-wave">
+            <span>WAVE</span>
+            <strong id="waveValue">01</strong>
+          </div>
+        </div>
+
+        <div class="ship-status">
+          <div class="status-heading">
+            <span>HULL INTEGRITY</span>
+            <strong id="healthValue">100%</strong>
+          </div>
+          <div class="health-track" aria-hidden="true">
+            <span id="healthBar"></span>
+          </div>
+        </div>
+
+        <div class="hud-actions">
+          <button id="soundButton" class="icon-button" type="button" aria-label="Toggle sound">SFX</button>
+          <button id="pauseButton" class="icon-button" type="button" aria-label="Pause game">Ⅱ</button>
+        </div>
+      </header>
+
+      <div class="threat-indicator" aria-hidden="true">
+        <span></span>
+        <b>THREAT GRID ONLINE</b>
+        <span></span>
+      </div>
+
+      <section class="hud weapon-panel" aria-label="Weapon selection">
+        <p class="eyebrow">WEAPON SYSTEM</p>
+        <button class="weapon-card active" data-weapon="laser" type="button">
+          <span class="weapon-icon laser-icon" aria-hidden="true"></span>
+          <span><b>PHOTON LASER</b><small>Rapid fire · 1 DMG</small></span>
+          <em>01</em>
+        </button>
+        <button class="weapon-card" data-weapon="missile" type="button">
+          <span class="weapon-icon missile-icon" aria-hidden="true"></span>
+          <span><b>SEEKER MISSILE</b><small>Homing · 3 DMG</small></span>
+          <em>02</em>
+        </button>
+        <p class="switch-hint"><kbd>ALT</kbd> / <kbd>⌘</kbd> SWITCH</p>
+      </section>
+
+      <section class="hud radar-panel" aria-label="Radar">
+        <div class="radar" id="radar" aria-hidden="true">
+          <span class="radar-sweep"></span>
+          <i class="radar-ship"></i>
+        </div>
+        <div>
+          <p class="eyebrow">PROXIMITY RADAR</p>
+          <strong id="threatCount">0 CONTACTS</strong>
+          <small>ASTEROID FIELD</small>
+        </div>
+      </section>
+
+      <div class="controls-tip" aria-label="Keyboard controls">
+        <span><kbd>WASD</kbd> / <kbd>ARROWS</kbd> MOVE</span>
+        <span><kbd>SPACE</kbd> FIRE</span>
+        <span><kbd>P</kbd> PAUSE</span>
+      </div>
+
+      <section id="startOverlay" class="game-overlay visible" aria-labelledby="startTitle">
+        <div class="overlay-kicker"><span></span> FLIGHT SYSTEM READY <span></span></div>
+        <h2 id="startTitle">ENTER THE<br /><em>STARFALL</em></h2>
+        <p>Survive the asteroid storm. Small rocks break fast.<br />Heavy-class asteroids demand sustained fire.</p>
+        <button id="startButton" class="primary-button" type="button">
+          <span>LAUNCH MISSION</span>
+          <small>PRESS SPACE</small>
+        </button>
+      </section>
+
+      <section id="pauseOverlay" class="game-overlay" aria-labelledby="pauseTitle">
+        <div class="overlay-kicker"><span></span> FLIGHT HOLD <span></span></div>
+        <h2 id="pauseTitle">MISSION <em>PAUSED</em></h2>
+        <p>Your ship is holding position.</p>
+        <button id="resumeButton" class="primary-button" type="button">RESUME MISSION</button>
+      </section>
+
+      <section id="gameOverOverlay" class="game-overlay" aria-labelledby="gameOverTitle">
+        <div class="overlay-kicker danger"><span></span> SIGNAL LOST <span></span></div>
+        <h2 id="gameOverTitle">SHIP <em>DESTROYED</em></h2>
+        <div class="final-score"><span>FINAL SCORE</span><strong id="finalScore">000000</strong></div>
+        <button id="restartButton" class="primary-button" type="button">RELAUNCH</button>
+      </section>
+
+      <div class="mobile-controls" aria-label="Touch controls">
+        <div id="movePad" class="move-pad" aria-label="Drag to move">
+          <span id="moveStick"></span>
+        </div>
+        <div class="mobile-actions">
+          <button id="mobileSwitch" type="button">SWITCH</button>
+          <button id="mobileFire" class="fire-button" type="button">FIRE</button>
+        </div>
+      </div>
+
+      <div id="announcer" class="sr-only" aria-live="polite"></div>
+    </main>
+    <script src="game.js"></script>
+  </body>
+</html>
