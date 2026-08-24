@@ -10,13 +10,14 @@ A fast, responsive browser-based space shooter built with the Canvas API.
 - Pause with **P**.
 - Touch controls appear automatically on small screens.
 
-Asteroids vary in size, speed, and durability. Missed asteroids leave the battlefield safely—only direct collisions damage the ship.
+Asteroids vary in size, speed, and durability. Missed asteroids leave the battlefield safely—only direct collisions damage the ship. Every mission begins with the photon laser; all other weapons must be recovered as glowing pickups in the asteroid field.
 
 Destroyed asteroids can release permanent upgrades for the current mission:
 
 - **Overdrive** increases fire rate up to five levels.
 - **Wide Shot** adds additional firing lanes and visible wing cannons.
 - **Deflector Shield** absorbs collision damage and installs shield nodes on the hull.
+- **Seeker Missiles** unlock homing explosives and install visible wing pods.
 - **Plasma Cannon** unlocks piercing energy orbs and can be upgraded three times.
 - **Rail Driver** unlocks heavy piercing rounds and can be upgraded three times.
 
