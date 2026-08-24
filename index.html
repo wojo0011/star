@@ -41,19 +41,26 @@
         </div>
 
         <div class="ship-status">
-          <div class="status-heading">
-            <span>HULL INTEGRITY</span>
-            <strong id="healthValue">100%</strong>
-          </div>
-          <div class="health-track" aria-hidden="true">
-            <span id="healthBar"></span>
-          </div>
           <div class="status-heading shield-heading">
             <span>ENERGY SHIELD</span>
             <strong id="shieldValue">OFFLINE</strong>
           </div>
           <div class="health-track shield-track" aria-hidden="true">
             <span id="shieldBar"></span>
+          </div>
+          <div class="status-heading armor-heading">
+            <span>ARMOUR PLATING</span>
+            <strong id="armorValue">UNPLATED</strong>
+          </div>
+          <div class="health-track armor-track" aria-hidden="true">
+            <span id="armorBar"></span>
+          </div>
+          <div class="status-heading hull-heading">
+            <span>HULL INTEGRITY</span>
+            <strong id="healthValue">100%</strong>
+          </div>
+          <div class="health-track hull-track" aria-hidden="true">
+            <span id="healthBar"></span>
           </div>
         </div>
 
@@ -144,15 +151,23 @@
         </div>
         <div class="fabricator">
           <p class="eyebrow">FIELD FABRICATOR</p>
+          <p class="fabricator-note">Damage order: shield → armour → hull. Shield recharges slowly after combat; use the three repair controls for immediate recovery.</p>
           <div class="fabricator-grid">
             <button type="button" data-fabricate="fireRate"><span>OVERDRIVE</span><small>8 MU</small></button>
             <button type="button" data-fabricate="wideShot"><span>WIDE SHOT</span><small>10 MU</small></button>
-            <button type="button" data-fabricate="shield"><span>SHIELD</span><small>12 MU</small></button>
-            <button type="button" data-fabricate="repair"><span>HULL REPAIR</span><small>7 MU</small></button>
+            <button type="button" data-fabricate="shield"><span>SHIELD ARRAY</span><small>12 MU</small></button>
+            <button type="button" data-fabricate="shieldOvercharge"><span>OVERCHARGE</span><small>15 MU</small></button>
+            <button type="button" data-fabricate="shieldRepair"><span>SHIELD CHARGE</span><small>4 MU</small></button>
+            <button type="button" data-fabricate="armorRepair"><span>ARMOUR PATCH</span><small>6 MU</small></button>
+            <button type="button" data-fabricate="hullRepair"><span>HULL REPAIR</span><small>7 MU</small></button>
             <button type="button" data-fabricate="engine"><span>ENGINE</span><small>10 MU</small></button>
             <button type="button" data-fabricate="maneuver"><span>MANOEUVRE</span><small>9 MU</small></button>
             <button type="button" data-fabricate="armor"><span>ARMOUR</span><small>14 MU</small></button>
             <button type="button" data-fabricate="regeneration"><span>REGEN</span><small>16 MU</small></button>
+            <button type="button" data-fabricate="magnet"><span>MAG CAPTURE</span><small>11 MU</small></button>
+            <button type="button" data-fabricate="ricochet"><span>LASER BOUNCE</span><small>13 MU</small></button>
+            <button type="button" data-fabricate="cloak"><span>CLOAK</span><small>18 MU</small></button>
+            <button type="button" data-fabricate="rapidFire"><span>RAPID BURST</span><small>6 MU</small></button>
           </div>
         </div>
       </section>
@@ -187,9 +202,9 @@
         <h2 id="startTitle">BEYOND THE<br /><em>BLUE WORLD</em></h2>
         <div class="story-copy">
           <p>Earth's deep-space array has detected an impossible signal beyond the heliopause. You are the first pilot cleared to follow it.</p>
-          <p>Launch from Earth, cross the orbit of Mars, survive the asteroid belt, and navigate past the giant outer planets. Beyond Neptune, the mapped mission ends—and the unknown begins.</p>
+          <p>Launch from Earth, dive toward Mercury and Venus for a solar gravity assist, then sling outward past Mars, the asteroid belt, and the giant outer planets. Beyond Neptune, the mapped mission ends—and the unknown begins.</p>
         </div>
-        <div class="mission-brief"><span>OBJECTIVE</span><strong>LEAVE THE SOLAR SYSTEM</strong><small>Earth → Mars → Asteroid Belt → Outer Planets</small></div>
+        <div class="mission-brief"><span>OBJECTIVE</span><strong>LEAVE THE SOLAR SYSTEM</strong><small>Earth → Sun Assist → Mercury → Venus → Mars → Outer Planets</small></div>
         <button id="startButton" class="primary-button" type="button">
           <span>LAUNCH FROM EARTH</span>
           <small>PRESS SPACE</small>
