@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#030611" />
     <meta
       name="description"
-      content="Starfall Command — pilot a strike ship, dodge the asteroid field, and fight back with lasers and missiles."
+      content="Starfall Command — launch from Earth, escape the Solar System, cross the asteroid belt, and continue into endless deep space."
     />
     <title>Starfall Command</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -35,7 +35,7 @@
             <strong id="highScoreValue">000000</strong>
           </div>
           <div class="stat-block stat-wave">
-            <span>WAVE</span>
+            <span id="waveLabel">LEG</span>
             <strong id="waveValue">01</strong>
           </div>
         </div>
@@ -71,6 +71,12 @@
         <span></span>
       </div>
 
+      <section id="missionBanner" class="mission-banner" aria-live="polite">
+        <span id="missionNumber">MISSION 01</span>
+        <strong id="missionObjective">LAUNCH FROM EARTH</strong>
+        <div class="mission-progress" aria-hidden="true"><i id="missionProgress"></i></div>
+      </section>
+
       <section class="hud weapon-dock" aria-label="Weapon selection">
         <div class="active-weapon">
           <span id="activeWeaponIcon" class="weapon-icon laser-icon" aria-hidden="true"></span>
@@ -95,7 +101,7 @@
           <span class="config-shortcut"><kbd>O</kbd> CLOSE</span>
           <button id="closeSettingsButton" type="button" aria-label="Close game options">×</button>
         </div>
-        <p class="settings-note">Changes are saved on this device. Opening this panel pauses the mission.</p>
+        <p class="settings-note">Changes are saved on this device. Opening this panel pauses the mission. Browser audio unlocks after LAUNCH or TEST AUDIO.</p>
         <div class="settings-group">
           <p class="eyebrow">SECTOR FEATURES</p>
           <button class="setting-toggle" type="button" role="switch" data-setting="asteroids"><span>ASTEROIDS<small>Core targets and collision hazards</small></span></button>
@@ -109,6 +115,9 @@
           <p class="eyebrow">AUDIO &amp; VISUAL</p>
           <button class="setting-toggle" type="button" role="switch" data-setting="music"><span>MISSION MUSIC<small>Procedural ambient soundtrack</small></span></button>
           <button class="setting-toggle" type="button" role="switch" data-setting="soundFx"><span>SOUND FX<small>Weapons, impacts and alerts</small></span></button>
+          <label class="volume-control" for="musicVolume"><span>Music volume</span><output id="musicVolumeValue" for="musicVolume">65%</output><input id="musicVolume" data-volume="musicVolume" type="range" min="0" max="100" value="65" /></label>
+          <label class="volume-control" for="sfxVolume"><span>Sound FX volume</span><output id="sfxVolumeValue" for="sfxVolume">80%</output><input id="sfxVolume" data-volume="sfxVolume" type="range" min="0" max="100" value="80" /></label>
+          <button id="testAudioButton" class="test-audio-button" type="button">TEST AUDIO</button>
           <button class="setting-toggle" type="button" role="switch" data-setting="particles"><span>PARTICLE FX<small>Trails, sparks and explosions</small></span></button>
           <button class="setting-toggle" type="button" role="switch" data-setting="screenShake"><span>SCREEN SHAKE<small>Impact camera movement</small></span></button>
         </div>
@@ -168,16 +177,20 @@
         <span><kbd>WASD</kbd> / <kbd>ARROWS</kbd> MOVE</span>
         <span><kbd>SPACE</kbd> FIRE</span>
         <span><kbd>TAB</kbd> UPGRADES</span>
-        <span><kbd>O</kbd> OPTIONS</span>
+        <span><kbd>ESC</kbd> / <kbd>O</kbd> OPTIONS</span>
         <span><kbd>P</kbd> PAUSE</span>
       </div>
 
       <section id="startOverlay" class="game-overlay visible" aria-labelledby="startTitle">
-        <div class="overlay-kicker"><span></span> FLIGHT SYSTEM READY <span></span></div>
-        <h2 id="startTitle">ENTER THE<br /><em>STARFALL</em></h2>
-        <p>Recover weapons, elemental resources and ship upgrades in the field.<br />Evade alien fire and natural hazards. Planetary collisions are fatal.</p>
+        <div class="overlay-kicker"><span></span> MISSION 01 · EARTH DEPARTURE <span></span></div>
+        <h2 id="startTitle">BEYOND THE<br /><em>BLUE WORLD</em></h2>
+        <div class="story-copy">
+          <p>Earth's deep-space array has detected an impossible signal beyond the heliopause. You are the first pilot cleared to follow it.</p>
+          <p>Launch from Earth, cross the orbit of Mars, survive the asteroid belt, and navigate past the giant outer planets. Beyond Neptune, the mapped mission ends—and the unknown begins.</p>
+        </div>
+        <div class="mission-brief"><span>OBJECTIVE</span><strong>LEAVE THE SOLAR SYSTEM</strong><small>Earth → Mars → Asteroid Belt → Outer Planets</small></div>
         <button id="startButton" class="primary-button" type="button">
-          <span>LAUNCH MISSION</span>
+          <span>LAUNCH FROM EARTH</span>
           <small>PRESS SPACE</small>
         </button>
       </section>
@@ -195,6 +208,19 @@
         <p id="gameOverReason" class="game-over-reason">HULL INTEGRITY FAILED</p>
         <div class="final-score"><span>FINAL SCORE</span><strong id="finalScore">000000</strong></div>
         <button id="restartButton" class="primary-button" type="button">RELAUNCH</button>
+      </section>
+
+      <section id="missionCompleteOverlay" class="game-overlay" aria-labelledby="missionCompleteTitle">
+        <div class="overlay-kicker"><span></span> HELIOPAUSE CROSSED <span></span></div>
+        <h2 id="missionCompleteTitle">MISSION 01<br /><em>COMPLETE</em></h2>
+        <div class="story-copy compact">
+          <p>Neptune falls behind you. The Sun becomes another star, and the signal ahead grows stronger.</p>
+          <p>Mission 2 begins in uncharted space. There is no mapped destination—and, for now, no end.</p>
+        </div>
+        <button id="missionTwoButton" class="primary-button" type="button">
+          <span>ENTER DEEP SPACE</span>
+          <small>MISSION 02 · ENDLESS</small>
+        </button>
       </section>
 
       <div class="mobile-controls" aria-label="Touch controls">
