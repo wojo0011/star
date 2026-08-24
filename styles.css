@@ -451,13 +451,125 @@ button {
   font-size: 0.48rem;
 }
 
-.upgrade-panel {
+.weapon-dock {
+  bottom: 34px;
+  left: clamp(15px, 2.6vw, 45px);
+  width: 225px;
+  padding: 10px 11px 9px;
+  border-left: 2px solid var(--cyan);
+}
+
+.active-weapon {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: 9px;
+}
+
+.active-weapon > span:last-child,
+.active-weapon small,
+.active-weapon strong,
+.active-weapon em {
+  display: block;
+}
+
+.active-weapon small {
+  color: var(--cyan);
+  font-size: 0.46rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+}
+
+.active-weapon strong {
+  margin-top: 2px;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+}
+
+.active-weapon em {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-style: normal;
+}
+
+.weapon-slots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.weapon-slot {
+  width: 25px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+  cursor: pointer;
+  font: 800 0.55rem ui-monospace, monospace;
+}
+
+.weapon-slot:hover,
+.weapon-slot:focus-visible,
+.weapon-slot.active {
+  outline: none;
+  color: #041017;
+  border-color: var(--cyan);
+  background: var(--cyan);
+  box-shadow: 0 0 10px rgba(86, 244, 255, 0.35);
+}
+
+.switch-compact {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.42rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.switch-compact kbd {
+  min-width: 22px;
+  padding: 2px 3px;
+}
+
+.config-popover {
+  top: 96px;
   right: clamp(15px, 2.6vw, 45px);
-  bottom: 145px;
-  width: 250px;
-  min-height: 70px;
-  padding: 12px 14px;
-  border-right: 2px solid #b56cff;
+  width: 260px;
+  padding: 13px;
+  border-top: 2px solid #b56cff;
+  z-index: 7;
+}
+
+.config-popover[hidden] {
+  display: none;
+}
+
+.config-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.config-heading button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(181, 108, 255, 0.35);
+  background: rgba(181, 108, 255, 0.08);
+  color: #d9b8ff;
+  cursor: pointer;
+  line-height: 1;
+}
+
+#configButton.active {
+  color: #e1c2ff;
+  border-color: #b56cff;
+  box-shadow: 0 0 14px rgba(181, 108, 255, 0.2);
 }
 
 .upgrade-list {
@@ -905,6 +1017,57 @@ kbd {
 
   .rail-icon::after {
     right: 7px;
+  }
+
+  .weapon-dock {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 50%;
+    width: 190px;
+    padding: 7px 8px;
+    border-left-width: 1px;
+    transform: translateX(-50%);
+  }
+
+  .active-weapon {
+    grid-template-columns: 25px 1fr;
+    gap: 6px;
+  }
+
+  .active-weapon .weapon-icon {
+    width: 23px;
+    height: 23px;
+  }
+
+  .active-weapon strong {
+    font-size: 0.53rem;
+  }
+
+  .active-weapon em,
+  .switch-compact {
+    display: none;
+  }
+
+  .weapon-slots {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .weapon-slot {
+    width: 20px;
+    height: 18px;
+    font-size: 0.45rem;
+  }
+
+  .config-popover {
+    top: 73px;
+    right: 9px;
+    width: min(250px, calc(100vw - 18px));
+    padding: 10px;
   }
 
   .upgrade-panel {
