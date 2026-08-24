@@ -9,6 +9,7 @@ A fast, responsive browser-based space shooter built with the Canvas API.
 - Switch between unlocked weapons with **Alt** or **Command** on macOS.
 - Pause with **P**.
 - Open ship upgrades with **Tab**. Opening the CFG panel pauses the mission until it is closed.
+- Open mission options with **O**. The options panel also pauses the mission.
 - Touch controls appear automatically on small screens.
 
 Asteroids vary in size, speed, and durability. Missed asteroids leave the battlefield safely—only direct collisions damage the ship. Every mission begins with the photon laser; all other weapons must be recovered as glowing pickups in the asteroid field.
@@ -22,6 +23,8 @@ Fast diagonal shooting stars occasionally cross the battlefield. Contact damages
 Rare planets also drift through the sector in varied sizes. Gas giants, rocky worlds, habitable planets, icy worlds, forest planets, ocean planets, deserts, volcanic worlds, and toxic planets each have a distinct appearance. They can be safely avoided, but a direct planetary collision is an immediate game over.
 
 Hostile alien scouts, raiders, and gunships enter the field, maneuver across the upper sector, and fire aimed energy bolts at the player. Rarer orbital stations act as large rotating gun platforms. Hostiles may be unprotected, armored, shielded, or fortified with both defenses; armor reduces incoming damage while shields must be depleted before the hull can be hit. Their defense state is visible on the craft and in the status bars above it.
+
+The **OPT** panel can independently enable or disable asteroids, mineral drops, shooting stars, planets, alien ships, space stations, procedural mission music, sound effects, particle effects, and screen shake. Choices are saved locally. The soundtrack is generated with the Web Audio API and automatically fades while gameplay is paused.
 
 Destroyed asteroids can release permanent upgrades for the current mission:
 
@@ -37,6 +40,8 @@ Destroyed asteroids can release permanent upgrades for the current mission:
 - **Hull Regeneration** gradually repairs damage after a short damage-free delay.
 
 Each installed upgrade visibly changes the detailed ship model. Your high score is saved locally in the browser.
+
+Missile guidance caches its target and reacquires at a controlled interval instead of scanning every entity on every animation frame. Missile exhaust also uses a capped, lower-frequency particle trail to keep large volleys smooth.
 
 ## Run locally
 
