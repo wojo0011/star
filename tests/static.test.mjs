@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [html, css, game] = await Promise.all([
+const [html, css, game, favicon] = await Promise.all([
   readFile(new URL("../index.html", import.meta.url), "utf8"),
   readFile(new URL("../styles.css", import.meta.url), "utf8"),
   readFile(new URL("../game.js", import.meta.url), "utf8"),
+  readFile(new URL("../favicon.svg", import.meta.url), "utf8"),
 ]);
 
 assert.match(html, /id="gameCanvas"/);
@@ -16,6 +17,13 @@ assert.match(html, /class="weapon-slot" data-weapon="missile"[^>]*hidden disable
 assert.match(html, /id="configPopover"[^>]*hidden/);
 assert.match(html, /<kbd>TAB<\/kbd> UPGRADES/);
 assert.match(html, /id="gameOverReason"/);
+assert.match(html, /href="favicon\.svg"/);
+assert.match(html, /id="settingsPopover"[^>]*hidden/);
+assert.match(html, /<kbd>O<\/kbd> OPTIONS/);
+assert.match(html, /data-setting="asteroids"/);
+assert.match(html, /data-setting="music"/);
+assert.match(html, /data-setting="soundFx"/);
+assert.match(html, /data-setting="screenShake"/);
 assert.match(html, /id="activeWeaponName"/);
 assert.match(html, /id="matterValue"/);
 assert.match(html, /data-fabricate="engine"/);
@@ -28,7 +36,9 @@ assert.match(html, /id="mobileFire"/);
 assert.match(css, /@media \(max-width: 680px\)/);
 assert.match(game, /event\.code === "Space"/);
 assert.match(game, /event\.code === "Tab"/);
+assert.match(game, /event\.code === "KeyO"/);
 assert.match(game, /state === "config"/);
+assert.match(game, /state === "options"/);
 assert.match(game, /event\.key === "Meta"/);
 assert.match(game, /ship\.x = clamp/);
 assert.match(game, /ship\.y = clamp/);
@@ -55,6 +65,15 @@ assert.match(game, /function drawAlienShip/);
 assert.match(game, /function drawSpaceStation/);
 assert.match(game, /function drawEnemyProjectile/);
 assert.match(game, /defense: "fortified"/);
+assert.match(game, /function acquireMissileTarget/);
+assert.match(game, /projectile\.targetClock = 0\.12/);
+assert.match(game, /projectile\.trailClock > 0\.06/);
+assert.match(game, /particles\.length < 650/);
+assert.doesNotMatch(game, /for \(const candidate of \[\.\.\.asteroids/);
+assert.match(game, /starfall-settings-v1/);
+assert.match(game, /function setFeatureSetting/);
+assert.match(game, /function playMissionMusicChord/);
+assert.match(game, /function updateMusicState/);
 assert.match(game, /function fabricate/);
 assert.match(game, /upgrades\.regeneration > 0/);
 assert.match(game, /upgrades\.armor \* 0\.09/);
@@ -64,6 +83,8 @@ assert.match(game, /unlockedWeapons = new Set\(\["laser"\]\)/);
 assert.doesNotMatch(game, /asteroid\.y - asteroid\.radius > height[\s\S]{0,160}damageShip/);
 assert.match(css, /\.radar-dot\.planet-dot/);
 assert.match(css, /\.radar-dot\.hostile-dot/);
+assert.match(css, /\.setting-toggle\.enabled/);
+assert.match(favicon, /<svg[^>]+viewBox="0 0 64 64"/);
 assert.match(game, /localStorage\.setItem\("starfall-high-score"/);
 
 console.log("Static game checks passed.");
