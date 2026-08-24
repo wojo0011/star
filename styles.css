@@ -588,6 +588,100 @@ button {
   box-shadow: 0 0 14px rgba(181, 108, 255, 0.2);
 }
 
+#settingsButton.active {
+  color: #ffe0a3;
+  border-color: #ffb548;
+  box-shadow: 0 0 14px rgba(255, 181, 72, 0.2);
+}
+
+.settings-popover {
+  width: 330px;
+  border-top-color: #ffb548;
+}
+
+.settings-note {
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 0.5rem;
+  line-height: 1.45;
+}
+
+.settings-group + .settings-group {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(118, 164, 184, 0.14);
+}
+
+.settings-group > .eyebrow {
+  margin-bottom: 6px;
+}
+
+.setting-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  margin-top: 5px;
+  padding: 6px 48px 6px 9px;
+  border: 1px solid rgba(126, 163, 184, 0.16);
+  background: rgba(4, 12, 24, 0.65);
+  color: #d6e5ec;
+  text-align: left;
+  cursor: pointer;
+  transition: 140ms ease;
+}
+
+.setting-toggle::after {
+  content: attr(data-state);
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  min-width: 28px;
+  padding: 3px 4px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(126, 163, 184, 0.24);
+  color: #728593;
+  font: 800 0.44rem ui-monospace, monospace;
+  text-align: center;
+}
+
+.setting-toggle span,
+.setting-toggle small {
+  display: block;
+}
+
+.setting-toggle span {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.setting-toggle small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.45rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.setting-toggle.enabled {
+  border-color: rgba(86, 244, 255, 0.32);
+  background: rgba(22, 99, 113, 0.12);
+}
+
+.setting-toggle.enabled::after {
+  border-color: rgba(86, 244, 255, 0.58);
+  color: var(--cyan);
+  box-shadow: 0 0 9px rgba(86, 244, 255, 0.14);
+}
+
+.setting-toggle:hover,
+.setting-toggle:focus-visible {
+  outline: none;
+  border-color: #ffb548;
+}
+
 .upgrade-list {
   display: flex;
   flex-wrap: wrap;
