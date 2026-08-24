@@ -29,6 +29,8 @@
     activeWeaponStats: document.getElementById("activeWeaponStats"),
     configButton: document.getElementById("configButton"),
     configPopover: document.getElementById("configPopover"),
+    settingsButton: document.getElementById("settingsButton"),
+    settingsPopover: document.getElementById("settingsPopover"),
     matterValue: document.getElementById("matterValue"),
     resourceList: document.getElementById("resourceList"),
   };
@@ -131,6 +133,27 @@
     { id: "raider", name: "Alien raider", radius: 29, hp: 7, speed: 66, score: 760, color: "#c86cff" },
     { id: "gunship", name: "Alien gunship", radius: 36, hp: 11, speed: 48, score: 1250, color: "#ff7654" },
   ];
+  const defaultSettings = {
+    asteroids: true,
+    mineralDrops: true,
+    shootingStars: true,
+    planets: true,
+    alienShips: true,
+    spaceStations: true,
+    music: true,
+    soundFx: true,
+    particles: true,
+    screenShake: true,
+  };
+  const settings = { ...defaultSettings };
+  try {
+    const savedSettings = JSON.parse(localStorage.getItem("starfall-settings-v1") || "{}");
+    for (const key of Object.keys(defaultSettings)) {
+      if (typeof savedSettings[key] === "boolean") settings[key] = savedSettings[key];
+    }
+  } catch {
+    localStorage.removeItem("starfall-settings-v1");
+  }
 
   let width = window.innerWidth;
   let height = window.innerHeight;
@@ -138,6 +161,7 @@
   let lastTime = performance.now();
   let state = "idle";
   let configReturnState = null;
+  let settingsReturnState = null;
   let score = 0;
   let highScore = Number(localStorage.getItem("starfall-high-score") || 0);
   let health = 100;
@@ -149,8 +173,11 @@
   let elapsed = 0;
   let spawnClock = 0;
   let screenShake = 0;
-  let soundEnabled = true;
+  let soundEnabled = settings.soundFx;
   let audioContext = null;
+  let musicBus = null;
+  let musicInterval = 0;
+  let musicStep = 0;
   let radarClock = 0;
   let mobileFiring = false;
   let asteroidSequence = 0;
@@ -264,6 +291,7 @@
     matterBalance = 0;
     timeSinceDamage = 0;
     configReturnState = null;
+    settingsReturnState = null;
     asteroids.length = 0;
     projectiles.length = 0;
     particles.length = 0;
@@ -299,12 +327,14 @@
     ui.pause.classList.remove("visible");
     ui.gameOver.classList.remove("visible");
     setConfigOpen(false);
+    setSettingsOpen(false);
     ui.announcer.textContent = "Mission launched";
     lastTime = performance.now();
+    updateMusicState();
   }
 
   function togglePause(forceResume = false) {
-    if (state === "idle" || state === "gameover" || state === "config") return;
+    if (state === "idle" || state === "gameover" || state === "config" || state === "options") return;
     if (state === "paused" || forceResume) {
       state = "running";
       ui.pause.classList.remove("visible");
@@ -315,10 +345,12 @@
       ui.pause.classList.add("visible");
       ui.announcer.textContent = "Mission paused";
     }
+    updateMusicState();
   }
 
   function setConfigOpen(open) {
     if (open && ui.configPopover.hidden) {
+      if (!ui.settingsPopover.hidden) setSettingsOpen(false);
       configReturnState = state;
       if (state === "running") state = "config";
       ui.announcer.textContent = "Ship configuration open. Mission paused.";
@@ -332,14 +364,86 @@
     ui.configButton.classList.toggle("active", open);
     ui.configButton.setAttribute("aria-expanded", String(open));
     ui.configButton.setAttribute("aria-label", open ? "Hide ship configuration" : "Show ship configuration");
+    updateMusicState();
+  }
+
+  function setSettingsOpen(open) {
+    if (open && ui.settingsPopover.hidden) {
+      if (!ui.configPopover.hidden) setConfigOpen(false);
+      settingsReturnState = state;
+      if (state === "running") state = "options";
+      ui.announcer.textContent = "Mission options open. Mission paused.";
+    } else if (!open && !ui.settingsPopover.hidden) {
+      if (state === "options") state = settingsReturnState === "running" ? "running" : settingsReturnState;
+      settingsReturnState = null;
+      lastTime = performance.now();
+      ui.announcer.textContent = state === "running" ? "Mission options closed. Mission resumed." : "Mission options closed.";
+    }
+    ui.settingsPopover.hidden = !open;
+    ui.settingsButton.classList.toggle("active", open);
+    ui.settingsButton.setAttribute("aria-expanded", String(open));
+    ui.settingsButton.setAttribute("aria-label", open ? "Hide game options" : "Show game options");
+    updateMusicState();
+  }
+
+  function updateSettingsUi() {
+    document.querySelectorAll("[data-setting]").forEach((button) => {
+      const enabled = Boolean(settings[button.dataset.setting]);
+      button.classList.toggle("enabled", enabled);
+      button.setAttribute("aria-checked", String(enabled));
+      button.setAttribute("data-state", enabled ? "ON" : "OFF");
+    });
+    soundEnabled = settings.soundFx;
+    ui.sound.classList.toggle("muted", !soundEnabled);
+    ui.sound.textContent = soundEnabled ? "SFX" : "OFF";
+    ui.sound.setAttribute("aria-label", soundEnabled ? "Mute sound effects" : "Enable sound effects");
+  }
+
+  function setFeatureSetting(key, enabled) {
+    if (!(key in settings)) return;
+    settings[key] = Boolean(enabled);
+    if (!settings.asteroids) {
+      for (const asteroid of asteroids) asteroid.alive = false;
+      asteroids.length = 0;
+    }
+    if (!settings.mineralDrops) resourceDrops.length = 0;
+    if (!settings.shootingStars) shootingStars.length = 0;
+    if (!settings.planets) planets.length = 0;
+    if (!settings.alienShips) {
+      for (const enemy of alienShips) enemy.alive = false;
+      alienShips.length = 0;
+      for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
+        if (!enemyProjectiles[i].stationBolt) enemyProjectiles.splice(i, 1);
+      }
+    }
+    if (!settings.spaceStations) {
+      for (const station of spaceStations) station.alive = false;
+      spaceStations.length = 0;
+      for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
+        if (enemyProjectiles[i].stationBolt) enemyProjectiles.splice(i, 1);
+      }
+    }
+    if (!settings.particles) {
+      particles.length = 0;
+      shockwaves.length = 0;
+    }
+    localStorage.setItem("starfall-settings-v1", JSON.stringify(settings));
+    updateSettingsUi();
+    if (key === "music") unlockAudio();
+    updateMusicState();
+    ui.announcer.textContent = `${key.replace(/([A-Z])/g, " $1")} ${enabled ? "enabled" : "disabled"}`;
   }
 
   function endGame(reason = "HULL INTEGRITY FAILED") {
     state = "gameover";
     configReturnState = null;
+    settingsReturnState = null;
     ui.configPopover.hidden = true;
     ui.configButton.classList.remove("active");
     ui.configButton.setAttribute("aria-expanded", "false");
+    ui.settingsPopover.hidden = true;
+    ui.settingsButton.classList.remove("active");
+    ui.settingsButton.setAttribute("aria-expanded", "false");
     if (score > highScore) {
       highScore = score;
       localStorage.setItem("starfall-high-score", String(highScore));
@@ -349,6 +453,7 @@
     ui.highScore.textContent = padScore(highScore);
     ui.gameOver.classList.add("visible");
     ui.announcer.textContent = `${reason}. Final score ${score}`;
+    updateMusicState();
     playTone("explosion");
   }
 
@@ -444,6 +549,7 @@
     });
     asteroids.push({
       id: ++asteroidSequence,
+      alive: true,
       x: random(radius + 8, width - radius - 8),
       y: -radius - random(10, 100),
       vx: random(-18, 18),
@@ -504,6 +610,8 @@
           damage: 2 + level,
           life: 3.6,
           trailClock: 0,
+          targetClock: 0,
+          target: null,
           pierce: 1,
           hitIds: new Set(),
         });
@@ -577,6 +685,7 @@
   function destroyAsteroid(asteroid, cause = "impact") {
     const index = asteroids.indexOf(asteroid);
     if (index === -1) return;
+    asteroid.alive = false;
     asteroids.splice(index, 1);
     const strength = asteroid.type === "large" ? 1.7 : asteroid.type === "medium" ? 1.2 : 0.8;
     createExplosion(asteroid.x, asteroid.y, asteroid.radius, strength);
@@ -602,7 +711,7 @@
   }
 
   function dropAsteroidResources(asteroid) {
-    if (!asteroid.composition.metals.length) return;
+    if (!settings.mineralDrops || !asteroid.composition.metals.length) return;
     const sizeYield = asteroid.type === "large" ? 3 : asteroid.type === "medium" ? 2 : 1;
     for (const metal of asteroid.composition.metals) {
       resourceDrops.push({
@@ -777,6 +886,7 @@
   }
 
   function createSparks(x, y, count, color) {
+    if (!settings.particles) return;
     for (let i = 0; i < count; i += 1) {
       const angle = random(0, TAU);
       const speed = random(40, 180);
@@ -795,6 +905,7 @@
   }
 
   function createExplosion(x, y, radius, strength = 1) {
+    if (!settings.particles) return;
     const count = Math.round(clamp(radius * 0.75, 12, 42));
     shockwaves.push({ x, y, radius: 2, maxRadius: radius * 1.75, life: 0.38, maxLife: 0.38 });
     for (let i = 0; i < count; i += 1) {
@@ -910,6 +1021,7 @@
     const radius = type.radius;
     alienShips.push({
       id: `alien-${++hostileSequence}`,
+      alive: true,
       kind: "ship",
       type,
       x: random(radius + 20, width - radius - 20),
@@ -945,6 +1057,7 @@
     const x = random(radius + 28, width - radius - 28);
     spaceStations.push({
       id: `station-${++hostileSequence}`,
+      alive: true,
       kind: "station",
       x,
       y: -radius - 70,
@@ -1015,6 +1128,7 @@
     const collection = hostile.kind === "station" ? spaceStations : alienShips;
     const index = collection.indexOf(hostile);
     if (index === -1) return;
+    hostile.alive = false;
     collection.splice(index, 1);
     score += hostile.score;
     createExplosion(hostile.x, hostile.y, hostile.radius * 1.2, hostile.kind === "station" ? 2.5 : 1.5);
@@ -1047,8 +1161,25 @@
     }
   }
 
+  function acquireMissileTarget(projectile) {
+    let target = null;
+    let nearest = Infinity;
+    const consider = (candidate) => {
+      if (!candidate.alive || candidate.y >= projectile.y + 20) return;
+      const candidateDistance = distanceSq(projectile, candidate);
+      if (candidateDistance < nearest) {
+        nearest = candidateDistance;
+        target = candidate;
+      }
+    };
+    for (const asteroid of asteroids) consider(asteroid);
+    for (const enemy of alienShips) consider(enemy);
+    for (const station of spaceStations) consider(station);
+    return target;
+  }
+
   function update(dt, now) {
-    if (state === "paused" || state === "config") return;
+    if (state === "paused" || state === "config" || state === "options") return;
     updateStars(dt);
     if (state !== "running") return;
 
@@ -1058,34 +1189,34 @@
     if (upgrades.regeneration > 0 && timeSinceDamage > 3.5 && health < maxHealth) {
       health = Math.min(maxHealth, health + (0.5 + upgrades.regeneration * 0.65) * dt);
     }
-    shootingStarClock += dt;
-    if (shootingStarClock >= nextShootingStar) {
+    if (settings.shootingStars) shootingStarClock += dt;
+    if (settings.shootingStars && shootingStarClock >= nextShootingStar) {
       shootingStarClock = 0;
       nextShootingStar = random(7, 13);
       spawnShootingStar();
     }
-    planetClock += dt;
-    if (planetClock >= nextPlanet) {
+    if (settings.planets) planetClock += dt;
+    if (settings.planets && planetClock >= nextPlanet) {
       planetClock = 0;
       nextPlanet = random(27, 44);
       spawnPlanet();
     }
-    alienClock += dt;
-    if (alienClock >= nextAlien) {
+    if (settings.alienShips) alienClock += dt;
+    if (settings.alienShips && alienClock >= nextAlien) {
       alienClock = 0;
       nextAlien = random(Math.max(7.5, 12.5 - getWave() * 0.35), Math.max(12, 19 - getWave() * 0.3));
       spawnAlienShip();
     }
-    stationClock += dt;
-    if (stationClock >= nextStation) {
+    if (settings.spaceStations) stationClock += dt;
+    if (settings.spaceStations && stationClock >= nextStation) {
       stationClock = 0;
       nextStation = random(38, 62);
       spawnSpaceStation();
     }
     const wave = getWave();
     const spawnDelay = Math.max(0.48, 1.25 - (wave - 1) * 0.05);
-    spawnClock += dt;
-    if (spawnClock >= spawnDelay) {
+    if (settings.asteroids) spawnClock += dt;
+    if (settings.asteroids && spawnClock >= spawnDelay) {
       spawnClock -= spawnDelay;
       spawnAsteroid();
       if (wave >= 4 && Math.random() < 0.08) spawnAsteroid();
@@ -1121,31 +1252,29 @@
       const projectile = projectiles[i];
       projectile.life -= dt;
       if (projectile.type === "missile") {
-        let target = null;
-        let nearest = Infinity;
-        for (const candidate of [...asteroids, ...alienShips, ...spaceStations]) {
-          if (candidate.y >= projectile.y + 20) continue;
-          const d = distanceSq(projectile, candidate);
-          if (d < nearest) {
-            nearest = d;
-            target = candidate;
-          }
+        projectile.targetClock -= dt;
+        let target = projectile.target;
+        if (target && (!target.alive || target.y >= projectile.y + 20)) target = null;
+        if (!target && projectile.targetClock <= 0) {
+          target = acquireMissileTarget(projectile);
+          projectile.targetClock = 0.12;
         }
+        projectile.target = target;
         if (target) {
           const angle = Math.atan2(target.y - projectile.y, target.x - projectile.x);
           projectile.vx += (Math.cos(angle) * 390 - projectile.vx) * Math.min(1, dt * 3.4);
           projectile.vy += (Math.sin(angle) * 390 - projectile.vy) * Math.min(1, dt * 3.4);
         }
         projectile.trailClock += dt;
-        if (projectile.trailClock > 0.025) {
+        if (projectile.trailClock > 0.06 && particles.length < 650) {
           projectile.trailClock = 0;
           particles.push({
             x: projectile.x,
             y: projectile.y + 7,
             vx: random(-12, 12),
             vy: random(40, 85),
-            life: 0.28,
-            maxLife: 0.28,
+            life: 0.22,
+            maxLife: 0.22,
             size: random(1.5, 3.3),
             color: Math.random() > 0.5 ? "#ff8a3d" : "#ffc95a",
             drag: 0.96,
@@ -1185,6 +1314,7 @@
         projectiles.splice(i, 1);
         continue;
       }
+      let projectileRemoved = false;
       for (const asteroid of [...asteroids]) {
         if (projectile.hitIds.has(asteroid.id)) continue;
         const hitRadius = projectile.radius + asteroid.radius;
@@ -1197,11 +1327,12 @@
           }
           if (projectile.pierce <= 0) {
             projectiles.splice(i, 1);
+            projectileRemoved = true;
             break;
           }
         }
       }
-      if (!projectiles.includes(projectile)) continue;
+      if (projectileRemoved) continue;
       for (const hostile of [...alienShips, ...spaceStations]) {
         if (projectile.hitIds.has(hostile.id)) continue;
         const hitRadius = projectile.radius + hostile.radius * 0.76;
@@ -1214,6 +1345,7 @@
           }
           if (projectile.pierce <= 0) {
             projectiles.splice(i, 1);
+            projectileRemoved = true;
             break;
           }
         }
@@ -1442,8 +1574,8 @@
     drawNebula();
     drawStars();
 
-    const shakeX = screenShake ? random(-screenShake, screenShake) : 0;
-    const shakeY = screenShake ? random(-screenShake, screenShake) : 0;
+    const shakeX = settings.screenShake && screenShake ? random(-screenShake, screenShake) : 0;
+    const shakeY = settings.screenShake && screenShake ? random(-screenShake, screenShake) : 0;
     ctx.translate(shakeX, shakeY);
     drawGuideLines();
     for (const planet of planets) drawPlanet(planet);
@@ -2513,9 +2645,77 @@
   function unlockAudio() {
     if (!audioContext) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) audioContext = new AudioCtx();
+      if (AudioCtx) {
+        audioContext = new AudioCtx();
+        musicBus = audioContext.createGain();
+        musicBus.gain.setValueAtTime(0.0001, audioContext.currentTime);
+        musicBus.connect(audioContext.destination);
+      }
     }
     if (audioContext?.state === "suspended") audioContext.resume();
+  }
+
+  function playMissionMusicChord() {
+    if (!audioContext || !musicBus || !settings.music || state !== "running") return;
+    const progression = [
+      [55, 82.41, 110],
+      [46.25, 69.3, 92.5],
+      [49, 73.42, 98],
+      [41.2, 61.74, 82.41],
+    ];
+    const chord = progression[musicStep % progression.length];
+    const now = audioContext.currentTime;
+    musicStep += 1;
+    chord.forEach((frequency, index) => {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = index === 0 ? "sine" : "triangle";
+      oscillator.frequency.setValueAtTime(frequency, now);
+      oscillator.detune.setValueAtTime(index === 2 ? 5 : index === 1 ? -4 : 0, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(index === 0 ? 0.028 : 0.013, now + 0.45);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.15);
+      oscillator.connect(gain).connect(musicBus);
+      oscillator.start(now);
+      oscillator.stop(now + 3.2);
+    });
+    const signal = audioContext.createOscillator();
+    const signalGain = audioContext.createGain();
+    signal.type = "sine";
+    signal.frequency.setValueAtTime(chord[1] * 4, now + 1.05);
+    signalGain.gain.setValueAtTime(0.0001, now);
+    signalGain.gain.linearRampToValueAtTime(0.009, now + 1.12);
+    signalGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.72);
+    signal.connect(signalGain).connect(musicBus);
+    signal.start(now + 1.05);
+    signal.stop(now + 1.75);
+  }
+
+  function stopMissionMusic() {
+    if (musicInterval) {
+      window.clearInterval(musicInterval);
+      musicInterval = 0;
+    }
+    if (audioContext && musicBus) {
+      const now = audioContext.currentTime;
+      musicBus.gain.cancelScheduledValues(now);
+      musicBus.gain.setValueAtTime(Math.max(0.0001, musicBus.gain.value), now);
+      musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    }
+  }
+
+  function updateMusicState() {
+    if (!audioContext || !musicBus || !settings.music || state !== "running") {
+      stopMissionMusic();
+      return;
+    }
+    if (musicInterval) return;
+    const now = audioContext.currentTime;
+    musicBus.gain.cancelScheduledValues(now);
+    musicBus.gain.setValueAtTime(Math.max(0.0001, musicBus.gain.value), now);
+    musicBus.gain.linearRampToValueAtTime(1, now + 0.35);
+    playMissionMusicChord();
+    musicInterval = window.setInterval(playMissionMusicChord, 2600);
   }
 
   function playTone(type, strength = 1) {
@@ -2573,6 +2773,11 @@
       if (state !== "gameover") setConfigOpen(ui.configPopover.hidden);
       return;
     }
+    if (event.code === "KeyO" && !event.repeat) {
+      event.preventDefault();
+      if (state !== "gameover") setSettingsOpen(ui.settingsPopover.hidden);
+      return;
+    }
     if ((event.code === "AltLeft" || event.code === "AltRight" || event.key === "Meta") && !event.repeat) {
       event.preventDefault();
       if (state === "running") switchWeapon();
@@ -2592,6 +2797,7 @@
     }
     if (event.code === "Escape") {
       if (!ui.configPopover.hidden) setConfigOpen(false);
+      else if (!ui.settingsPopover.hidden) setSettingsOpen(false);
       else if (state === "paused") togglePause(true);
       return;
     }
@@ -2610,15 +2816,17 @@
   document.querySelectorAll("[data-fabricate]").forEach((button) => {
     button.addEventListener("click", () => fabricate(button.dataset.fabricate));
   });
+  document.querySelectorAll("[data-setting]").forEach((button) => {
+    button.addEventListener("click", () => setFeatureSetting(button.dataset.setting, !settings[button.dataset.setting]));
+  });
   ui.configButton.addEventListener("click", () => setConfigOpen(ui.configPopover.hidden));
   document.getElementById("closeConfigButton").addEventListener("click", () => setConfigOpen(false));
+  ui.settingsButton.addEventListener("click", () => setSettingsOpen(ui.settingsPopover.hidden));
+  document.getElementById("closeSettingsButton").addEventListener("click", () => setSettingsOpen(false));
   ui.sound.addEventListener("click", () => {
     unlockAudio();
-    soundEnabled = !soundEnabled;
-    ui.sound.classList.toggle("muted", !soundEnabled);
-    ui.sound.textContent = soundEnabled ? "SFX" : "OFF";
-    ui.sound.setAttribute("aria-label", soundEnabled ? "Mute sound" : "Enable sound");
-    if (soundEnabled) playTone("switch");
+    setFeatureSetting("soundFx", !settings.soundFx);
+    if (settings.soundFx) playTone("switch");
   });
 
   const movePad = document.getElementById("movePad");
@@ -2667,6 +2875,7 @@
   highScore = Number.isFinite(highScore) ? highScore : 0;
   ui.highScore.textContent = padScore(highScore);
   resize();
+  updateSettingsUi();
   updateResourceUi();
   updateHud(true);
   requestAnimationFrame(frame);
