@@ -290,6 +290,48 @@ button {
   box-shadow: 0 0 8px var(--orange);
 }
 
+.mission-banner {
+  position: fixed;
+  z-index: 4;
+  top: 121px;
+  left: 50%;
+  display: grid;
+  min-width: min(360px, 66vw);
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.mission-banner > span {
+  color: var(--cyan);
+  font: 800 0.48rem ui-monospace, monospace;
+  letter-spacing: 0.18em;
+}
+
+.mission-banner > strong {
+  margin-top: 3px;
+  color: #d9f9ff;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+}
+
+.mission-progress {
+  width: 100%;
+  height: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+  background: rgba(86, 244, 255, 0.1);
+}
+
+.mission-progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #56f4ff, #b56cff);
+  box-shadow: 0 0 9px #56f4ff;
+  transition: width 180ms linear;
+}
+
 .weapon-panel {
   bottom: 40px;
   left: clamp(15px, 2.6vw, 45px);
@@ -544,7 +586,7 @@ button {
   overflow-y: auto;
   padding: 13px;
   border-top: 2px solid #b56cff;
-  z-index: 7;
+  z-index: 10;
 }
 
 .config-popover[hidden] {
@@ -680,6 +722,54 @@ button {
 .setting-toggle:focus-visible {
   outline: none;
   border-color: #ffb548;
+}
+
+.volume-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 5px 10px;
+  margin-top: 8px;
+  padding: 8px 9px;
+  border: 1px solid rgba(126, 163, 184, 0.16);
+  background: rgba(4, 12, 24, 0.65);
+  color: #d6e5ec;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.volume-control output {
+  color: var(--cyan);
+  font-family: ui-monospace, monospace;
+}
+
+.volume-control input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--cyan);
+  cursor: pointer;
+}
+
+.test-audio-button {
+  width: 100%;
+  margin-top: 7px;
+  padding: 8px;
+  border: 1px solid rgba(255, 181, 72, 0.5);
+  background: rgba(255, 181, 72, 0.08);
+  color: #ffd995;
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.test-audio-button:hover,
+.test-audio-button:focus-visible {
+  outline: none;
+  background: #ffb548;
+  color: #170d04;
 }
 
 .upgrade-list {
@@ -934,6 +1024,12 @@ kbd {
   box-shadow: 0 0 10px #45a9ff;
 }
 
+.radar-dot.planet-dot.solar-dot {
+  background: #f7e4a6;
+  border-color: #fff7dc;
+  box-shadow: 0 0 11px #63c9ff;
+}
+
 .radar-dot.hostile-dot {
   width: 5px;
   height: 5px;
@@ -1046,6 +1142,51 @@ kbd {
   line-height: 1.7;
 }
 
+#startOverlay h2,
+#missionCompleteOverlay h2 {
+  font-size: clamp(2.8rem, 7.4vw, 6.2rem);
+}
+
+.story-copy {
+  max-width: 650px;
+  margin: 2px 0 14px;
+  color: #aab9c9;
+  font-size: clamp(0.72rem, 1.1vw, 0.9rem);
+  line-height: 1.55;
+}
+
+.story-copy p {
+  margin: 5px 0;
+}
+
+.story-copy.compact {
+  max-width: 570px;
+  margin-bottom: 22px;
+}
+
+.mission-brief {
+  display: grid;
+  min-width: min(480px, 86vw);
+  margin: 0 0 18px;
+  padding: 10px 16px;
+  border: 1px solid rgba(86, 244, 255, 0.25);
+  background: rgba(7, 35, 52, 0.42);
+}
+
+.mission-brief span,
+.mission-brief small {
+  color: var(--muted);
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+}
+
+.mission-brief strong {
+  margin: 3px 0;
+  color: var(--cyan-bright);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+}
+
 .primary-button {
   position: relative;
   min-width: 220px;
@@ -1147,6 +1288,10 @@ kbd {
     top: 92px;
   }
 
+  .mission-banner {
+    top: 112px;
+  }
+
   .stat-block:nth-child(2) {
     display: none;
   }
@@ -1176,6 +1321,38 @@ kbd {
 
   .brand-lockup h1 {
     font-size: 0.78rem;
+  }
+
+  .mission-banner {
+    top: 76px;
+    min-width: 52vw;
+  }
+
+  .mission-banner > span {
+    font-size: 0.4rem;
+  }
+
+  .mission-banner > strong {
+    overflow: hidden;
+    font-size: 0.48rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #startOverlay,
+  #missionCompleteOverlay {
+    justify-content: flex-start;
+    overflow-y: auto;
+    padding-top: 34px;
+  }
+
+  #startOverlay h2,
+  #missionCompleteOverlay h2 {
+    font-size: clamp(2.45rem, 14vw, 4rem);
+  }
+
+  .story-copy {
+    font-size: 0.68rem;
   }
 
   .mission-stats {
