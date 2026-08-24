@@ -9,6 +9,7 @@
       content="Starfall Command — pilot a strike ship, dodge the asteroid field, and fight back with lasers and missiles."
     />
     <title>Starfall Command</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -57,6 +58,7 @@
         </div>
 
         <div class="hud-actions">
+          <button id="settingsButton" class="icon-button" type="button" aria-label="Show game options" aria-expanded="false">OPT</button>
           <button id="configButton" class="icon-button" type="button" aria-label="Show ship configuration" aria-expanded="false">CFG</button>
           <button id="soundButton" class="icon-button" type="button" aria-label="Toggle sound">SFX</button>
           <button id="pauseButton" class="icon-button" type="button" aria-label="Pause game">Ⅱ</button>
@@ -84,6 +86,31 @@
           <button class="weapon-slot" data-weapon="plasma" type="button" aria-label="Select plasma cannon" hidden disabled>3</button>
           <button class="weapon-slot" data-weapon="railgun" type="button" aria-label="Select rail driver" hidden disabled>4</button>
           <span class="switch-compact"><kbd>ALT</kbd> SWITCH</span>
+        </div>
+      </section>
+
+      <section id="settingsPopover" class="hud config-popover settings-popover" aria-label="Game options" hidden>
+        <div class="config-heading">
+          <p class="eyebrow">MISSION OPTIONS</p>
+          <span class="config-shortcut"><kbd>O</kbd> CLOSE</span>
+          <button id="closeSettingsButton" type="button" aria-label="Close game options">×</button>
+        </div>
+        <p class="settings-note">Changes are saved on this device. Opening this panel pauses the mission.</p>
+        <div class="settings-group">
+          <p class="eyebrow">SECTOR FEATURES</p>
+          <button class="setting-toggle" type="button" role="switch" data-setting="asteroids"><span>ASTEROIDS<small>Core targets and collision hazards</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="mineralDrops"><span>MINERAL DROPS<small>Collectible elemental resources</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="shootingStars"><span>SHOOTING STARS<small>Fast diagonal hazards</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="planets"><span>PLANETS<small>Rare fatal navigation hazards</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="alienShips"><span>ALIEN SHIPS<small>Scouts, raiders and gunships</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="spaceStations"><span>SPACE STATIONS<small>Heavy hostile gun platforms</small></span></button>
+        </div>
+        <div class="settings-group">
+          <p class="eyebrow">AUDIO &amp; VISUAL</p>
+          <button class="setting-toggle" type="button" role="switch" data-setting="music"><span>MISSION MUSIC<small>Procedural ambient soundtrack</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="soundFx"><span>SOUND FX<small>Weapons, impacts and alerts</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="particles"><span>PARTICLE FX<small>Trails, sparks and explosions</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="screenShake"><span>SCREEN SHAKE<small>Impact camera movement</small></span></button>
         </div>
       </section>
 
@@ -141,6 +168,7 @@
         <span><kbd>WASD</kbd> / <kbd>ARROWS</kbd> MOVE</span>
         <span><kbd>SPACE</kbd> FIRE</span>
         <span><kbd>TAB</kbd> UPGRADES</span>
+        <span><kbd>O</kbd> OPTIONS</span>
         <span><kbd>P</kbd> PAUSE</span>
       </div>
 
