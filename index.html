@@ -47,6 +47,13 @@
           <div class="health-track" aria-hidden="true">
             <span id="healthBar"></span>
           </div>
+          <div class="status-heading shield-heading">
+            <span>ENERGY SHIELD</span>
+            <strong id="shieldValue">OFFLINE</strong>
+          </div>
+          <div class="health-track shield-track" aria-hidden="true">
+            <span id="shieldBar"></span>
+          </div>
         </div>
 
         <div class="hud-actions">
@@ -73,8 +80,30 @@
           <span><b>SEEKER MISSILE</b><small>Homing · 3 DMG</small></span>
           <em>02</em>
         </button>
+        <button class="weapon-card locked" data-weapon="plasma" type="button" disabled>
+          <span class="weapon-icon plasma-icon" aria-hidden="true"></span>
+          <span><b>PLASMA CANNON</b><small>LOCKED · FIND CORE</small></span>
+          <em>03</em>
+        </button>
+        <button class="weapon-card locked" data-weapon="railgun" type="button" disabled>
+          <span class="weapon-icon rail-icon" aria-hidden="true"></span>
+          <span><b>RAIL DRIVER</b><small>LOCKED · FIND CORE</small></span>
+          <em>04</em>
+        </button>
         <p class="switch-hint"><kbd>ALT</kbd> / <kbd>⌘</kbd> SWITCH</p>
       </section>
+
+      <section class="hud upgrade-panel" aria-label="Installed ship upgrades">
+        <p class="eyebrow">SHIP CONFIGURATION</p>
+        <div id="upgradeList" class="upgrade-list">
+          <span class="empty-upgrades">NO UPGRADES INSTALLED</span>
+        </div>
+      </section>
+
+      <div id="upgradeToast" class="upgrade-toast" role="status" aria-live="polite">
+        <span>UPGRADE ACQUIRED</span>
+        <strong id="upgradeToastTitle">SYSTEM ENHANCED</strong>
+      </div>
 
       <section class="hud radar-panel" aria-label="Radar">
         <div class="radar" id="radar" aria-hidden="true">
@@ -97,7 +126,7 @@
       <section id="startOverlay" class="game-overlay visible" aria-labelledby="startTitle">
         <div class="overlay-kicker"><span></span> FLIGHT SYSTEM READY <span></span></div>
         <h2 id="startTitle">ENTER THE<br /><em>STARFALL</em></h2>
-        <p>Survive the asteroid storm. Small rocks break fast.<br />Heavy-class asteroids demand sustained fire.</p>
+        <p>Survive the asteroid storm and recover upgrade cores.<br />Missed asteroids pass safely—only direct collisions damage your ship.</p>
         <button id="startButton" class="primary-button" type="button">
           <span>LAUNCH MISSION</span>
           <small>PRESS SPACE</small>
