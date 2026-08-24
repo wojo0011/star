@@ -10,6 +10,8 @@
     waveLabel: document.getElementById("waveLabel"),
     health: document.getElementById("healthValue"),
     healthBar: document.getElementById("healthBar"),
+    armor: document.getElementById("armorValue"),
+    armorBar: document.getElementById("armorBar"),
     shield: document.getElementById("shieldValue"),
     shieldBar: document.getElementById("shieldBar"),
     threats: document.getElementById("threatCount"),
@@ -141,6 +143,9 @@
   ];
   const solarBodyTypes = {
     earth: { id: "earth", name: "Earth", colors: ["#176bb1", "#43a66c", "#eefcff"], atmosphere: "#64cfff" },
+    sun: { id: "sun", name: "Sun", colors: ["#ff9f1c", "#fff3a3", "#ef4d21"], atmosphere: "#ffd35a" },
+    mercury: { id: "mercury", name: "Mercury", colors: ["#827a72", "#c9bba9", "#443f3c"], atmosphere: "#b6aca1" },
+    venus: { id: "venus", name: "Venus", colors: ["#c88a3f", "#f2d08a", "#8b542b"], atmosphere: "#ffd47b" },
     mars: { id: "mars", name: "Mars", colors: ["#a8492c", "#d47c51", "#6d2e23"], atmosphere: "#e68b64" },
     jupiter: { id: "jupiter", name: "Jupiter", colors: ["#c89468", "#ead6b7", "#9b5b4d"], atmosphere: "#f3c78e" },
     saturn: { id: "saturn", name: "Saturn", colors: ["#d7bd79", "#f1dfa8", "#a98955"], atmosphere: "#ffe2a0" },
@@ -148,13 +153,28 @@
     neptune: { id: "neptune", name: "Neptune", colors: ["#2455b9", "#4a8be1", "#182d75"], atmosphere: "#5597ff" },
   };
   const solarMissionEvents = [
-    { at: 7, id: "mars", side: 0.23, radius: 64, speed: 54 },
-    { at: 36, id: "jupiter", side: 0.78, radius: 142, speed: 51 },
-    { at: 49, id: "saturn", side: 0.24, radius: 112, speed: 55, rings: true },
-    { at: 61, id: "uranus", side: 0.77, radius: 76, speed: 58, rings: true },
-    { at: 71, id: "neptune", side: 0.27, radius: 82, speed: 61 },
+    { at: 5, id: "sun", side: -0.07, radius: 230, speed: 35, edge: true, label: "SOLAR GRAVITY ASSIST" },
+    { at: 12, id: "mercury", side: 0.74, radius: 35, speed: 64 },
+    { at: 20, id: "venus", side: 0.24, radius: 61, speed: 57 },
+    { at: 30, id: "mars", side: 0.77, radius: 64, speed: 54 },
+    { at: 68, id: "jupiter", side: 0.78, radius: 142, speed: 51 },
+    { at: 82, id: "saturn", side: 0.24, radius: 112, speed: 55, rings: true },
+    { at: 98, id: "uranus", side: 0.77, radius: 76, speed: 58, rings: true },
+    { at: 111, id: "neptune", side: 0.27, radius: 82, speed: 61 },
   ];
-  const SOLAR_MISSION_DURATION = 88;
+  const solarEquipmentEvents = [
+    { at: 2, type: "satellite", label: "EARTH RELAY SATELLITE", side: 0.7, scale: 1.05 },
+    { at: 8, type: "telescope", label: "ORBITAL SPACE TELESCOPE", side: 0.32, scale: 1.1 },
+    { at: 15, type: "probe", label: "SOLAR OBSERVATION PROBE", side: 0.78, scale: 0.9 },
+    { at: 24, type: "science", label: "VENUS SCIENCE PLATFORM", side: 0.68, scale: 1.05 },
+    { at: 35, type: "probe", label: "MARS ORBITER", side: 0.26, scale: 0.82 },
+    { at: 44, type: "miner", label: "AUTONOMOUS MINING RIG", side: 0.72, scale: 1.2 },
+    { at: 53, type: "miner", label: "BELT REFINERY DRONE", side: 0.28, scale: 0.95 },
+    { at: 73, type: "probe", label: "JUPITER ATMOSPHERIC PROBE", side: 0.34, scale: 0.86 },
+    { at: 89, type: "science", label: "DEEP SPACE SCIENCE ARRAY", side: 0.72, scale: 1.18 },
+    { at: 116, type: "telescope", label: "HELIOPAUSE TELESCOPE", side: 0.74, scale: 1.12 },
+  ];
+  const SOLAR_MISSION_DURATION = 128;
   const alienShipTypes = [
     { id: "scout", name: "Alien scout", radius: 23, hp: 4, speed: 82, score: 420, color: "#ff5d9e" },
     { id: "raider", name: "Alien raider", radius: 29, hp: 7, speed: 66, score: 760, color: "#c86cff" },
@@ -201,6 +221,7 @@
   let mission = 1;
   let missionElapsed = 0;
   let solarEventIndex = 0;
+  let solarEquipmentIndex = 0;
   let beltAnnounced = false;
   let configReturnState = null;
   let settingsReturnState = null;
@@ -208,8 +229,12 @@
   let highScore = Number(localStorage.getItem("starfall-high-score") || 0);
   let health = 100;
   let maxHealth = 100;
+  let armor = 0;
+  let armorMax = 0;
   let shield = 0;
   let shieldMax = 0;
+  let cloakTimer = 0;
+  let rapidFireTimer = 0;
   let weapon = "laser";
   let lastShot = 0;
   let elapsed = 0;
@@ -254,6 +279,7 @@
   const shootingStars = [];
   const planets = [];
   const solarPlanets = [];
+  const spaceObjects = [];
   const alienShips = [];
   const spaceStations = [];
   const enemyProjectiles = [];
@@ -267,6 +293,10 @@
     maneuver: 0,
     armor: 0,
     regeneration: 0,
+    magnet: 0,
+    shieldOvercharge: 0,
+    ricochet: 0,
+    cloak: 0,
     missile: 0,
     plasma: 0,
     railgun: 0,
@@ -320,8 +350,12 @@
     score = 0;
     health = 100;
     maxHealth = 100;
+    armor = 0;
+    armorMax = 0;
     shield = 0;
     shieldMax = 0;
+    cloakTimer = 0;
+    rapidFireTimer = 0;
     elapsed = 0;
     spawnClock = 0;
     lastShot = 0;
@@ -343,6 +377,7 @@
     settingsReturnState = null;
     missionElapsed = 0;
     solarEventIndex = 0;
+    solarEquipmentIndex = 0;
     beltAnnounced = false;
     asteroids.length = 0;
     projectiles.length = 0;
@@ -353,6 +388,7 @@
     shootingStars.length = 0;
     planets.length = 0;
     solarPlanets.length = 0;
+    spaceObjects.length = 0;
     alienShips.length = 0;
     spaceStations.length = 0;
     enemyProjectiles.length = 0;
@@ -427,6 +463,7 @@
     shootingStars.length = 0;
     planets.length = 0;
     solarPlanets.length = 0;
+    spaceObjects.length = 0;
     alienShips.length = 0;
     spaceStations.length = 0;
     enemyProjectiles.length = 0;
@@ -511,6 +548,7 @@
     ui.configButton.classList.toggle("active", open);
     ui.configButton.setAttribute("aria-expanded", String(open));
     ui.configButton.setAttribute("aria-label", open ? "Hide ship configuration" : "Show ship configuration");
+    if (open) updateUpgradeUi();
     updateMusicState();
   }
 
@@ -641,7 +679,10 @@
       card.setAttribute("aria-pressed", String(card.dataset.weapon === weapon));
     });
     ui.activeWeaponName.textContent = weaponDefinitions[weapon].name.toUpperCase();
-    ui.activeWeaponStats.textContent = weaponDefinitions[weapon].description;
+    const modifiers = [];
+    if (weapon === "laser" && upgrades.ricochet > 0) modifiers.push(`${upgrades.ricochet} BOUNCE${upgrades.ricochet > 1 ? "S" : ""}`);
+    if (rapidFireTimer > 0) modifiers.push(`RAPID ${Math.ceil(rapidFireTimer)}S`);
+    ui.activeWeaponStats.textContent = [weaponDefinitions[weapon].description, ...modifiers].join(" · ");
     ui.activeWeaponIcon.className = `weapon-icon ${weapon === "railgun" ? "rail-icon" : `${weapon}-icon`}`;
     if (announce) {
       ui.announcer.textContent = `${weaponDefinitions[weapon].name} selected`;
@@ -744,7 +785,8 @@
 
   function fire(now) {
     if (state !== "running") return;
-    const delay = weaponDefinitions[weapon].delay * Math.pow(0.86, upgrades.fireRate);
+    const burstMultiplier = rapidFireTimer > 0 ? 0.3 : 1;
+    const delay = weaponDefinitions[weapon].delay * Math.pow(0.86, upgrades.fireRate) * burstMultiplier;
     if (now - lastShot < delay) return;
     lastShot = now;
     const wide = upgrades.wideShot;
@@ -764,6 +806,7 @@
           damage: 1,
           life: 1.6,
           pierce: 1,
+          ricochetRemaining: upgrades.ricochet,
           hitIds: new Set(),
         });
       }
@@ -915,23 +958,31 @@
     const candidates = [];
     if (upgrades.fireRate < 5) candidates.push("fireRate", "fireRate");
     if (upgrades.wideShot < 4) candidates.push("wideShot", "wideShot");
-    if (upgrades.shield < 4 || shield < shieldMax) candidates.push("shield", "shield");
+    if (upgrades.shield < 4) candidates.push("shield", "shield");
+    if (upgrades.shield > 0 && upgrades.shieldOvercharge < 4) candidates.push("shieldOvercharge");
+    if (shieldMax > 0 && shield < shieldMax) candidates.push("shieldRepair", "shieldRepair");
     if (upgrades.engine < 4) candidates.push("engine");
     if (upgrades.maneuver < 4) candidates.push("maneuver");
     if (upgrades.armor < 4) candidates.push("armor");
+    if (armorMax > 0 && armor < armorMax) candidates.push("armorRepair", "armorRepair");
+    if (health < maxHealth) candidates.push("hullRepair", "hullRepair");
     if (upgrades.regeneration < 4) candidates.push("regeneration");
+    if (upgrades.magnet < 4) candidates.push("magnet");
+    if (upgrades.ricochet < 3) candidates.push("ricochet");
+    candidates.push("cloak", "rapidFire", "rapidFire");
     if (upgrades.missile < 3) candidates.push("missile", "missile");
     if (upgrades.plasma < 3) candidates.push("plasma");
     if (upgrades.railgun < 3) candidates.push("railgun");
     if (!candidates.length) candidates.push("shield");
     const type = preferredType || candidates[Math.floor(Math.random() * candidates.length)];
+    const scalableLevel = ["magnet", "shieldOvercharge", "ricochet", "cloak"].includes(type) ? Math.min(4, (upgrades[type] || 0) + 1) : 0;
     powerUps.push({
       type,
       x,
       y,
       vx: random(-18, 18),
       vy: random(56, 78),
-      radius: 17,
+      radius: 17 + scalableLevel * 1.7,
       phase: random(0, TAU),
       life: 11,
     });
@@ -947,9 +998,18 @@
       label = `WIDE SHOT MK ${upgrades.wideShot}`;
     } else if (type === "shield") {
       upgrades.shield = Math.min(4, upgrades.shield + 1);
-      shieldMax = Math.min(110, 35 + (upgrades.shield - 1) * 25);
+      shieldMax = 35 + (upgrades.shield - 1) * 25 + upgrades.shieldOvercharge * 22;
       shield = shieldMax;
       label = upgrades.shield === 1 ? "DEFLECTOR SHIELD ONLINE" : `SHIELD ARRAY MK ${upgrades.shield}`;
+    } else if (type === "shieldOvercharge") {
+      if (upgrades.shield === 0) upgrades.shield = 1;
+      upgrades.shieldOvercharge = Math.min(4, upgrades.shieldOvercharge + 1);
+      shieldMax = 35 + (upgrades.shield - 1) * 25 + upgrades.shieldOvercharge * 22;
+      shield = shieldMax;
+      label = `SHIELD OVERCHARGE MK ${upgrades.shieldOvercharge}`;
+    } else if (type === "shieldRepair") {
+      shield = Math.min(shieldMax, shield + Math.max(28, shieldMax * 0.55));
+      label = "SHIELD ENERGY RESTORED";
     } else if (type === "engine") {
       upgrades.engine = Math.min(4, upgrades.engine + 1);
       label = `ENGINE THRUST MK ${upgrades.engine}`;
@@ -958,12 +1018,31 @@
       label = `MANOEUVRING MK ${upgrades.maneuver}`;
     } else if (type === "armor") {
       upgrades.armor = Math.min(4, upgrades.armor + 1);
-      maxHealth = 100 + upgrades.armor * 25;
-      health = Math.min(maxHealth, health + 25);
+      armorMax = 40 + (upgrades.armor - 1) * 25;
+      armor = armorMax;
       label = `ARMOUR PLATING MK ${upgrades.armor}`;
+    } else if (type === "armorRepair") {
+      armor = Math.min(armorMax, armor + Math.max(32, armorMax * 0.55));
+      label = "ARMOUR PLATING REPAIRED";
+    } else if (type === "hullRepair") {
+      health = Math.min(maxHealth, health + 45);
+      label = "HULL INTEGRITY RESTORED";
     } else if (type === "regeneration") {
       upgrades.regeneration = Math.min(4, upgrades.regeneration + 1);
       label = `HULL REGENERATION MK ${upgrades.regeneration}`;
+    } else if (type === "magnet") {
+      upgrades.magnet = Math.min(4, upgrades.magnet + 1);
+      label = `MAGNETIC CAPTURE MK ${upgrades.magnet}`;
+    } else if (type === "ricochet") {
+      upgrades.ricochet = Math.min(3, upgrades.ricochet + 1);
+      label = `LASER RICOCHET ×${upgrades.ricochet}`;
+    } else if (type === "cloak") {
+      upgrades.cloak = Math.min(4, upgrades.cloak + 1);
+      cloakTimer = Math.max(cloakTimer, upgrades.cloak * 10);
+      label = `CLOAK ACTIVE · ${upgrades.cloak * 10} SECONDS`;
+    } else if (type === "rapidFire") {
+      rapidFireTimer = Math.min(30, rapidFireTimer + 8);
+      label = `TEMPORARY RAPID FIRE · ${Math.ceil(rapidFireTimer)} SECONDS`;
     } else if (type === "missile") {
       upgrades.missile = Math.min(3, upgrades.missile + 1);
       unlockedWeapons.add("missile");
@@ -999,10 +1078,15 @@
     if (upgrades.fireRate) chips.push(`<span class="upgrade-chip">OVERDRIVE ${upgrades.fireRate}</span>`);
     if (upgrades.wideShot) chips.push(`<span class="upgrade-chip">WIDE ${upgrades.wideShot}</span>`);
     if (upgrades.shield) chips.push(`<span class="upgrade-chip shield">SHIELD ${Math.round(shield)}/${shieldMax}</span>`);
+    if (upgrades.shieldOvercharge) chips.push(`<span class="upgrade-chip shield">OVERCHARGE ${upgrades.shieldOvercharge}</span>`);
     if (upgrades.engine) chips.push(`<span class="upgrade-chip">ENGINE ${upgrades.engine}</span>`);
     if (upgrades.maneuver) chips.push(`<span class="upgrade-chip">MANOEUVRE ${upgrades.maneuver}</span>`);
-    if (upgrades.armor) chips.push(`<span class="upgrade-chip">ARMOUR ${upgrades.armor}</span>`);
+    if (upgrades.armor) chips.push(`<span class="upgrade-chip">ARMOUR ${Math.round(armor)}/${armorMax}</span>`);
     if (upgrades.regeneration) chips.push(`<span class="upgrade-chip shield">REGEN ${upgrades.regeneration}</span>`);
+    if (upgrades.magnet) chips.push(`<span class="upgrade-chip shield">MAG CAPTURE ${upgrades.magnet}</span>`);
+    if (upgrades.ricochet) chips.push(`<span class="upgrade-chip weapon">BOUNCE ×${upgrades.ricochet}</span>`);
+    if (upgrades.cloak) chips.push(`<span class="upgrade-chip${cloakTimer > 0 ? " shield" : ""}">CLOAK ${upgrades.cloak}${cloakTimer > 0 ? ` · ${Math.ceil(cloakTimer)}S` : ""}</span>`);
+    if (rapidFireTimer > 0) chips.push(`<span class="upgrade-chip weapon">RAPID ${Math.ceil(rapidFireTimer)}S</span>`);
     if (upgrades.missile) chips.push(`<span class="upgrade-chip weapon">MISSILE ${upgrades.missile}</span>`);
     if (upgrades.plasma) chips.push(`<span class="upgrade-chip weapon">PLASMA ${upgrades.plasma}</span>`);
     if (upgrades.railgun) chips.push(`<span class="upgrade-chip weapon">RAIL ${upgrades.railgun}</span>`);
@@ -1010,7 +1094,11 @@
     updateFabricatorButtons();
   }
 
-  const fabricationCosts = { fireRate: 8, wideShot: 10, shield: 12, repair: 7, engine: 10, maneuver: 9, armor: 14, regeneration: 16 };
+  const fabricationCosts = {
+    fireRate: 8, wideShot: 10, shield: 12, shieldOvercharge: 15, shieldRepair: 4,
+    engine: 10, maneuver: 9, armor: 14, armorRepair: 6, hullRepair: 7,
+    regeneration: 16, magnet: 11, ricochet: 13, cloak: 18, rapidFire: 6,
+  };
 
   function updateResourceUi() {
     ui.matterValue.textContent = String(Math.floor(matterBalance));
@@ -1027,16 +1115,23 @@
   }
 
   function fabricationAtMax(type) {
-    if (type === "repair") return health >= maxHealth;
-    const limits = { fireRate: 5, wideShot: 4, shield: 4, engine: 4, maneuver: 4, armor: 4, regeneration: 4 };
+    if (type === "shieldRepair") return shieldMax <= 0 || shield >= shieldMax;
+    if (type === "armorRepair") return armorMax <= 0 || armor >= armorMax;
+    if (type === "hullRepair") return health >= maxHealth;
+    if (type === "rapidFire") return rapidFireTimer >= 30;
+    const limits = { fireRate: 5, wideShot: 4, shield: 4, shieldOvercharge: 4, engine: 4, maneuver: 4, armor: 4, regeneration: 4, magnet: 4, ricochet: 3, cloak: 4 };
     return upgrades[type] >= limits[type];
   }
 
   function updateFabricatorButtons() {
     document.querySelectorAll("[data-fabricate]").forEach((button) => {
       const type = button.dataset.fabricate;
-      button.disabled = matterBalance < fabricationCosts[type] || fabricationAtMax(type);
-      button.title = fabricationAtMax(type) ? "Maximum level reached" : `${fabricationCosts[type]} refined matter units`;
+      const unavailable = fabricationAtMax(type);
+      button.disabled = matterBalance < fabricationCosts[type] || unavailable;
+      if (type === "shieldRepair" && shieldMax <= 0) button.title = "Install a shield array first";
+      else if (type === "armorRepair" && armorMax <= 0) button.title = "Install armour plating first";
+      else if (unavailable) button.title = type.endsWith("Repair") ? "System already fully restored" : "Maximum level reached";
+      else button.title = `${fabricationCosts[type]} refined matter units`;
     });
   }
 
@@ -1047,14 +1142,9 @@
       return;
     }
     matterBalance -= cost;
-    if (type === "repair") {
-      health = Math.min(maxHealth, health + 45);
-      showUpgradeToast("HULL INTEGRITY RESTORED", "FABRICATION COMPLETE");
-      playTone("upgrade");
-    } else {
-      applyUpgrade(type);
-      ui.upgradeToastKicker.textContent = "FABRICATION COMPLETE";
-    }
+    applyUpgrade(type);
+    ui.upgradeToastKicker.textContent = "FABRICATION COMPLETE";
+    ui.announcer.textContent = `FABRICATION COMPLETE: ${ui.upgradeToastTitle.textContent}`;
     updateResourceUi();
   }
 
@@ -1102,27 +1192,36 @@
   function damageShip(amount, x, y) {
     if (ship.invulnerable > 0 || state !== "running") return;
     timeSinceDamage = 0;
-    const armorReduction = upgrades.armor * 0.09;
-    let remainingDamage = amount * (1 - armorReduction);
+    let remainingDamage = amount;
+    let shieldAbsorbed = 0;
+    let armorAbsorbed = 0;
     if (shield > 0) {
       const absorbed = Math.min(shield, remainingDamage);
       shield -= absorbed;
       remainingDamage -= absorbed;
-      ship.invulnerable = remainingDamage > 0 ? 1.05 : 0.45;
+      shieldAbsorbed = absorbed;
       shockwaves.push({ x: ship.x, y: ship.y, radius: 24, maxRadius: 48, life: 0.3, maxLife: 0.3, color: "#63b8ff" });
       createSparks(x, y, 12, "#63b8ff");
-      updateUpgradeUi();
       playTone("shield");
-      if (remainingDamage <= 0) {
-        screenShake = Math.max(screenShake, 5);
-        return;
-      }
     }
-    health = Math.max(0, health - remainingDamage);
-    ship.invulnerable = 1.05;
-    screenShake = Math.max(screenShake, 11);
-    createExplosion(x, y, 26, 1.25);
-    playTone("damage");
+    if (remainingDamage > 0 && armor > 0) {
+      const absorbed = Math.min(armor, remainingDamage);
+      armor -= absorbed;
+      remainingDamage -= absorbed;
+      armorAbsorbed = absorbed;
+      createSparks(x, y, 15, "#e1eef5");
+      shockwaves.push({ x: ship.x, y: ship.y, radius: 19, maxRadius: 37, life: 0.24, maxLife: 0.24, color: "#dce8ef" });
+    }
+    if (remainingDamage > 0) {
+      health = Math.max(0, health - remainingDamage);
+      createExplosion(x, y, 26, 1.25);
+      playTone("damage");
+    } else if (armorAbsorbed > 0) {
+      playTone("impact", 0.75);
+    }
+    ship.invulnerable = remainingDamage > 0 ? 1.05 : shieldAbsorbed > 0 ? 0.45 : 0.62;
+    screenShake = Math.max(screenShake, remainingDamage > 0 ? 11 : armorAbsorbed > 0 ? 7 : 5);
+    updateUpgradeUi();
     if (health <= 0) {
       createExplosion(ship.x, ship.y, 56, 2.4);
       endGame();
@@ -1183,7 +1282,7 @@
     const type = solarBodyTypes[event.id];
     solarPlanets.push({
       type,
-      x: clamp(width * event.side, radius + 12, width - radius - 12),
+      x: event.edge ? width * event.side : clamp(width * event.side, radius + 12, width - radius - 12),
       y: -radius - 45,
       radius,
       vy: event.speed,
@@ -1192,9 +1291,25 @@
       phase: random(0, TAU),
       rings: Boolean(event.rings),
       collision: true,
-      label: `${type.name.toUpperCase()} · SOLAR SYSTEM`,
+      label: event.label || `${type.name.toUpperCase()} · SOLAR SYSTEM`,
     });
-    showUpgradeToast(`${type.name.toUpperCase()} APPROACH`, "MISSION 01 · NAVIGATION");
+    showUpgradeToast(event.id === "sun" ? "SOLAR GRAVITY ASSIST" : `${type.name.toUpperCase()} APPROACH`, "MISSION 01 · NAVIGATION");
+  }
+
+  function spawnSolarEquipment(event) {
+    const objectScale = clamp(width / 1000, 0.72, 1) * event.scale;
+    spaceObjects.push({
+      type: event.type,
+      label: event.label,
+      x: clamp(width * event.side, 48, width - 48),
+      y: -74,
+      vy: random(52, 68),
+      scale: objectScale,
+      rotation: random(-0.18, 0.18),
+      rotationSpeed: random(-0.16, 0.16),
+      phase: random(0, TAU),
+    });
+    ui.announcer.textContent = `Science contact: ${event.label.toLowerCase()}.`;
   }
 
   function updateSolarMission(dt) {
@@ -1203,18 +1318,22 @@
       spawnSolarPlanet(solarMissionEvents[solarEventIndex]);
       solarEventIndex += 1;
     }
-    if (!beltAnnounced && missionElapsed >= 18) {
+    while (solarEquipmentIndex < solarEquipmentEvents.length && missionElapsed >= solarEquipmentEvents[solarEquipmentIndex].at) {
+      spawnSolarEquipment(solarEquipmentEvents[solarEquipmentIndex]);
+      solarEquipmentIndex += 1;
+    }
+    if (!beltAnnounced && missionElapsed >= 38) {
       beltAnnounced = true;
       showUpgradeToast("DENSE ASTEROID BELT", "MISSION 01 · SURVIVE");
       ui.announcer.textContent = "Asteroid belt entered. Dodge or destroy incoming rocks.";
     }
-    if (settings.asteroids && missionElapsed >= 18 && missionElapsed < 43) {
-      const beltDelay = missionElapsed < 23 ? 0.86 : missionElapsed > 38 ? 0.92 : 0.68;
+    if (settings.asteroids && missionElapsed >= 38 && missionElapsed < 62) {
+      const beltDelay = missionElapsed < 43 ? 0.86 : missionElapsed > 57 ? 0.92 : 0.68;
       spawnClock += dt;
       if (spawnClock >= beltDelay) {
         spawnClock -= beltDelay;
         spawnAsteroid();
-        if (missionElapsed > 27 && missionElapsed < 36 && Math.random() < 0.14) spawnAsteroid();
+        if (missionElapsed > 47 && missionElapsed < 56 && Math.random() < 0.14) spawnAsteroid();
       }
     }
     if (missionElapsed >= SOLAR_MISSION_DURATION) completeMissionOne();
@@ -1254,6 +1373,7 @@
       fireClock: random(0.15, 0.9),
       fireDelay: random(2.05, 3.15),
       phase: random(0, TAU),
+      patrolPhase: 0,
       life: random(17, 24),
       flash: 0,
       shieldFlash: 0,
@@ -1289,6 +1409,7 @@
       fireClock: random(0.4, 1.2),
       fireDelay: random(2.7, 3.7),
       phase: random(0, TAU),
+      patrolPhase: 0,
       rotation: random(0, TAU),
       life: random(25, 34),
       flash: 0,
@@ -1361,16 +1482,22 @@
     if (hostile.kind === "station") hostile.rotation += dt * 0.24;
     const entrySpeed = hostile.kind === "station" ? 28 : hostile.type.speed;
     if (hostile.y < hostile.targetY) {
-      hostile.y = Math.min(hostile.targetY, hostile.y + entrySpeed * dt);
+      const nextY = Math.min(hostile.targetY, hostile.y + entrySpeed * dt);
+      if (nextY >= hostile.targetY) {
+        hostile.baseX = hostile.x;
+        hostile.patrolPhase = 0;
+      }
+      hostile.y = nextY;
     } else {
       hostile.life -= dt;
       const range = hostile.kind === "station" ? Math.min(70, width * 0.06) : Math.min(165, width * 0.15);
       const frequency = hostile.kind === "station" ? 0.32 : 0.75 + hostile.type.speed * 0.002;
-      hostile.x = clamp(hostile.baseX + Math.sin(hostile.phase * frequency) * range, hostile.radius + 12, width - hostile.radius - 12);
+      hostile.patrolPhase += dt * frequency;
+      hostile.x = clamp(hostile.baseX + Math.sin(hostile.patrolPhase) * range, hostile.radius + 12, width - hostile.radius - 12);
       if (hostile.life <= 0) hostile.y += (hostile.kind === "station" ? 38 : 105) * dt;
     }
     hostile.fireClock += dt;
-    if (hostile.life > 0 && hostile.y > 70 && hostile.fireClock >= hostile.fireDelay) {
+    if (cloakTimer <= 0 && hostile.life > 0 && hostile.y > 70 && hostile.fireClock >= hostile.fireDelay) {
       hostile.fireClock = 0;
       hostile.fireDelay *= random(0.92, 1.08);
       fireEnemyWeapon(hostile);
@@ -1394,6 +1521,34 @@
     return target;
   }
 
+  function ricochetLaser(projectile, source) {
+    if (projectile.type !== "laser" || projectile.ricochetRemaining <= 0) return false;
+    let target = null;
+    let nearest = (250 + upgrades.ricochet * 95) ** 2;
+    const consider = (candidate) => {
+      if (!candidate.alive || candidate === source || projectile.hitIds.has(candidate.id)) return;
+      const candidateDistance = distanceSq(projectile, candidate);
+      if (candidateDistance < nearest) {
+        nearest = candidateDistance;
+        target = candidate;
+      }
+    };
+    for (const asteroid of asteroids) consider(asteroid);
+    for (const enemy of alienShips) consider(enemy);
+    for (const station of spaceStations) consider(station);
+    if (!target) return false;
+    const angle = Math.atan2(target.y - projectile.y, target.x - projectile.x);
+    projectile.vx = Math.cos(angle) * 760;
+    projectile.vy = Math.sin(angle) * 760;
+    projectile.ricochetRemaining -= 1;
+    projectile.pierce = 1;
+    projectile.x += Math.cos(angle) * 6;
+    projectile.y += Math.sin(angle) * 6;
+    shockwaves.push({ x: projectile.x, y: projectile.y, radius: 2, maxRadius: 24, life: 0.18, maxLife: 0.18, color: "#71f7ff" });
+    playTone("ricochet");
+    return true;
+  }
+
   function update(dt, now) {
     if (state === "paused" || state === "config" || state === "options") return;
     updateStars(dt);
@@ -1406,6 +1561,14 @@
     }
     timeSinceDamage += dt;
     ship.invulnerable = Math.max(0, ship.invulnerable - dt);
+    const previousCloakSecond = Math.ceil(cloakTimer);
+    const previousRapidSecond = Math.ceil(rapidFireTimer);
+    cloakTimer = Math.max(0, cloakTimer - dt);
+    rapidFireTimer = Math.max(0, rapidFireTimer - dt);
+    if (Math.ceil(cloakTimer) !== previousCloakSecond || Math.ceil(rapidFireTimer) !== previousRapidSecond) updateUpgradeUi();
+    if (shieldMax > 0 && timeSinceDamage > 4.5 && shield < shieldMax) {
+      shield = Math.min(shieldMax, shield + (3.5 + upgrades.shieldOvercharge * 2.2) * dt);
+    }
     if (upgrades.regeneration > 0 && timeSinceDamage > 3.5 && health < maxHealth) {
       health = Math.min(maxHealth, health + (0.5 + upgrades.regeneration * 0.65) * dt);
     }
@@ -1545,6 +1708,7 @@
           if (projectile.type === "missile") {
             shockwaves.push({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
           }
+          ricochetLaser(projectile, asteroid);
           if (projectile.pierce <= 0) {
             projectiles.splice(i, 1);
             projectileRemoved = true;
@@ -1563,6 +1727,7 @@
           if (projectile.type === "missile") {
             shockwaves.push({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
           }
+          ricochetLaser(projectile, hostile);
           if (projectile.pierce <= 0) {
             projectiles.splice(i, 1);
             projectileRemoved = true;
@@ -1620,6 +1785,13 @@
       if (planet.y - planet.radius > height + 120) solarPlanets.splice(solarPlanets.indexOf(planet), 1);
     }
 
+    for (const object of [...spaceObjects]) {
+      object.y += object.vy * dt;
+      object.rotation += object.rotationSpeed * dt;
+      object.phase += dt;
+      if (object.y > height + 110) spaceObjects.splice(spaceObjects.indexOf(object), 1);
+    }
+
     for (const enemy of [...alienShips]) {
       updateHostile(enemy, dt);
       if (enemy.y - enemy.radius > height + 70) alienShips.splice(alienShips.indexOf(enemy), 1);
@@ -1663,8 +1835,9 @@
       pickup.life -= dt;
       pickup.phase += dt * 3.2;
       const dist = Math.sqrt(distanceSq(pickup, ship));
-      if (dist < 140) {
-        const attraction = 260 * (1 - dist / 140) + 85;
+      const captureRadius = 75 + upgrades.magnet * 115;
+      if (dist < captureRadius) {
+        const attraction = 220 + upgrades.magnet * 80 + 250 * (1 - dist / captureRadius);
         pickup.vx += ((ship.x - pickup.x) / Math.max(1, dist)) * attraction * dt;
         pickup.vy += ((ship.y - pickup.y) / Math.max(1, dist)) * attraction * dt;
       }
@@ -1684,8 +1857,9 @@
       drop.life -= dt;
       drop.phase += dt * 2.6;
       const dist = Math.sqrt(distanceSq(drop, ship));
-      if (dist < 165) {
-        const attraction = 290 * (1 - dist / 165) + 95;
+      const captureRadius = 90 + upgrades.magnet * 135;
+      if (dist < captureRadius) {
+        const attraction = 245 + upgrades.magnet * 90 + 280 * (1 - dist / captureRadius);
         drop.vx += ((ship.x - drop.x) / Math.max(1, dist)) * attraction * dt;
         drop.vy += ((ship.y - drop.y) / Math.max(1, dist)) * attraction * dt;
       }
@@ -1752,17 +1926,23 @@
   function updateMissionHud() {
     if (mission === 1) {
       ui.missionNumber.textContent = "MISSION 01 · SOLAR ESCAPE";
-      const objective = missionElapsed < 7
+      const objective = missionElapsed < 5
         ? "CLEAR EARTH ORBIT"
-        : missionElapsed < 18
-          ? "PASS THE ORBIT OF MARS"
-          : missionElapsed < 43
+        : missionElapsed < 12
+          ? "EXECUTE SOLAR GRAVITY ASSIST"
+          : missionElapsed < 20
+            ? "SWING PAST MERCURY"
+            : missionElapsed < 30
+              ? "NAVIGATE THE VENUS FLYBY"
+              : missionElapsed < 38
+                ? "PASS THE ORBIT OF MARS"
+                : missionElapsed < 62
             ? "SURVIVE THE ASTEROID BELT"
-            : missionElapsed < 61
-              ? "NAVIGATE JUPITER AND SATURN"
-              : missionElapsed < 78
-                ? "CROSS THE OUTER PLANETS"
-                : "REACH THE HELIOPAUSE";
+                  : missionElapsed < 88
+                    ? "NAVIGATE JUPITER AND SATURN"
+                    : missionElapsed < 114
+                      ? "CROSS THE OUTER PLANETS"
+                      : "REACH THE HELIOPAUSE";
       ui.missionObjective.textContent = objective;
       ui.missionProgress.style.width = `${clamp(missionElapsed / SOLAR_MISSION_DURATION, 0, 1) * 100}%`;
     } else {
@@ -1776,7 +1956,7 @@
     ui.score.textContent = padScore(score);
     ui.highScore.textContent = padScore(Math.max(highScore, score));
     if (mission === 1) {
-      const leg = missionElapsed < 18 ? 1 : missionElapsed < 43 ? 2 : missionElapsed < 61 ? 3 : missionElapsed < 78 ? 4 : 5;
+      const leg = missionElapsed < 12 ? 1 : missionElapsed < 38 ? 2 : missionElapsed < 62 ? 3 : missionElapsed < 88 ? 4 : missionElapsed < 114 ? 5 : 6;
       ui.waveLabel.textContent = "LEG";
       ui.wave.textContent = String(leg).padStart(2, "0");
     } else {
@@ -1791,7 +1971,9 @@
     ui.healthBar.style.background = healthColor;
     ui.shield.textContent = shieldMax > 0 ? `${Math.round(shield)} / ${shieldMax}` : "OFFLINE";
     ui.shieldBar.style.width = `${shieldMax > 0 ? (shield / shieldMax) * 100 : 0}%`;
-    const contacts = asteroids.length + shootingStars.length + planets.length + solarPlanets.length + alienShips.length + spaceStations.length;
+    ui.armor.textContent = armorMax > 0 ? `${Math.round(armor)} / ${armorMax}` : "UNPLATED";
+    ui.armorBar.style.width = `${armorMax > 0 ? (armor / armorMax) * 100 : 0}%`;
+    const contacts = asteroids.length + shootingStars.length + planets.length + solarPlanets.length + spaceObjects.length + alienShips.length + spaceStations.length;
     ui.threats.textContent = `${contacts} ${contacts === 1 ? "CONTACT" : "CONTACTS"}`;
     updateMissionHud();
     if (forceRadar) updateRadar();
@@ -1827,6 +2009,13 @@
       dot.style.top = `${clamp((planet.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
     }
+    for (const object of spaceObjects) {
+      const dot = document.createElement("i");
+      dot.className = "radar-dot equipment-dot";
+      dot.style.left = `${clamp((object.x / width) * 60 + 4, 3, 64)}px`;
+      dot.style.top = `${clamp((object.y / height) * 54 + 4, 3, 57)}px`;
+      ui.radar.appendChild(dot);
+    }
     for (const hostile of [...alienShips, ...spaceStations]) {
       const dot = document.createElement("i");
       dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : ""}`;
@@ -1854,6 +2043,7 @@
     ctx.translate(shakeX, shakeY);
     drawGuideLines();
     for (const planet of solarPlanets) drawSolarPlanet(planet);
+    for (const object of spaceObjects) drawSpaceObject(object);
     for (const planet of planets) drawPlanet(planet);
     for (const star of shootingStars) drawShootingStar(star);
     for (const asteroid of asteroids) drawAsteroid(asteroid);
@@ -1930,6 +2120,53 @@
     ctx.save();
     ctx.translate(planet.x, planet.y);
 
+    if (type.id === "sun") {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const corona = ctx.createRadialGradient(0, 0, r * 0.45, 0, 0, r * 1.45);
+      corona.addColorStop(0, "rgba(255, 248, 180, 0.98)");
+      corona.addColorStop(0.55, "rgba(255, 151, 32, 0.62)");
+      corona.addColorStop(1, "rgba(255, 61, 18, 0)");
+      ctx.fillStyle = corona;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.45, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+      const surface = ctx.createRadialGradient(-r * 0.32, -r * 0.35, r * 0.04, 0, 0, r);
+      surface.addColorStop(0, "#fffbd1");
+      surface.addColorStop(0.45, "#ffd34e");
+      surface.addColorStop(0.82, "#ff8a20");
+      surface.addColorStop(1, "#df3d16");
+      ctx.fillStyle = surface;
+      ctx.shadowBlur = 40;
+      ctx.shadowColor = "#ff9d2e";
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, TAU);
+      ctx.fill();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, TAU);
+      ctx.clip();
+      ctx.globalAlpha = 0.38;
+      ctx.strokeStyle = "#fff4a4";
+      for (let band = -5; band <= 5; band += 1) {
+        const y = band * r * 0.16 + Math.sin(planet.phase * 0.8 + band) * r * 0.045;
+        ctx.lineWidth = r * 0.045;
+        ctx.beginPath();
+        ctx.moveTo(-r, y);
+        ctx.bezierCurveTo(-r * 0.38, y - r * 0.12, r * 0.34, y + r * 0.1, r, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fff1a6";
+      ctx.font = "900 8px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(planet.label, 0, -r - 18);
+      ctx.restore();
+      return;
+    }
+
     if (type.id === "earth") {
       const moonAngle = planet.phase * 0.16 - 0.8;
       const moonX = Math.cos(moonAngle) * r * 1.28;
@@ -1995,6 +2232,28 @@
       for (let i = -2; i <= 2; i += 1) {
         ctx.beginPath();
         ctx.arc(-r * 0.05, i * r * 0.28, r * 0.62, 0.2, 2.72);
+        ctx.stroke();
+      }
+    } else if (type.id === "mercury") {
+      const craters = [[-0.42, -0.28, 0.17], [0.28, -0.4, 0.12], [0.48, 0.18, 0.19], [-0.12, 0.42, 0.14], [-0.55, 0.38, 0.09], [0.08, -0.05, 0.08]];
+      for (const [x, y, size] of craters) {
+        ctx.fillStyle = "rgba(37, 34, 33, 0.45)";
+        ctx.strokeStyle = "rgba(238, 221, 202, 0.24)";
+        ctx.lineWidth = Math.max(1, r * 0.018);
+        ctx.beginPath();
+        ctx.ellipse(x * r, y * r, size * r, size * r * 0.7, 0.25, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else if (type.id === "venus") {
+      ctx.globalAlpha = 0.42;
+      for (let band = -6; band <= 6; band += 1) {
+        const y = band * r * 0.14;
+        ctx.strokeStyle = band % 2 === 0 ? "#fff0bc" : "#9f622f";
+        ctx.lineWidth = r * 0.08;
+        ctx.beginPath();
+        ctx.moveTo(-r, y);
+        ctx.bezierCurveTo(-r * 0.35, y + r * 0.08, r * 0.4, y - r * 0.07, r, y);
         ctx.stroke();
       }
     } else if (type.id === "mars") {
@@ -2099,6 +2358,154 @@
     ctx.font = "800 8px ui-monospace, monospace";
     ctx.textAlign = "center";
     ctx.fillText(planet.label, 0, -r - 14);
+    ctx.restore();
+  }
+
+  function drawSpaceObject(object) {
+    const pulse = 0.65 + Math.sin(object.phase * 3.2) * 0.25;
+    ctx.save();
+    ctx.translate(object.x, object.y);
+    ctx.scale(object.scale, object.scale);
+    ctx.rotate(object.rotation);
+
+    const drawPanel = (x, y, panelWidth, panelHeight) => {
+      const panel = ctx.createLinearGradient(x, y, x + panelWidth, y + panelHeight);
+      panel.addColorStop(0, "#123a65");
+      panel.addColorStop(0.5, "#2b7fc4");
+      panel.addColorStop(1, "#071c3c");
+      ctx.fillStyle = panel;
+      ctx.strokeStyle = "rgba(126, 213, 255, 0.82)";
+      ctx.lineWidth = 1;
+      ctx.fillRect(x, y, panelWidth, panelHeight);
+      ctx.strokeRect(x, y, panelWidth, panelHeight);
+      ctx.strokeStyle = "rgba(165, 225, 255, 0.32)";
+      for (let column = 1; column < 4; column += 1) {
+        ctx.beginPath();
+        ctx.moveTo(x + panelWidth * column / 4, y);
+        ctx.lineTo(x + panelWidth * column / 4, y + panelHeight);
+        ctx.stroke();
+      }
+    };
+
+    if (object.type !== "miner") {
+      drawPanel(-48, -8, 34, 16);
+      drawPanel(14, -8, 34, 16);
+      ctx.strokeStyle = "#8399a7";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-15, 0);
+      ctx.lineTo(15, 0);
+      ctx.stroke();
+    }
+
+    if (object.type === "satellite") {
+      ctx.fillStyle = "#b9c6ce";
+      ctx.strokeStyle = "#f1fbff";
+      ctx.fillRect(-11, -15, 22, 30);
+      ctx.strokeRect(-11, -15, 22, 30);
+      ctx.fillStyle = "#ffb548";
+      ctx.fillRect(-8, -11, 16, 8);
+      ctx.strokeStyle = "#dbe9ef";
+      ctx.beginPath();
+      ctx.moveTo(0, -15);
+      ctx.lineTo(0, -28);
+      ctx.moveTo(-8, -24);
+      ctx.quadraticCurveTo(0, -34, 8, -24);
+      ctx.stroke();
+    } else if (object.type === "telescope") {
+      ctx.fillStyle = "#d6e1e7";
+      ctx.strokeStyle = "#ffffff";
+      ctx.fillRect(-10, -24, 20, 43);
+      ctx.strokeRect(-10, -24, 20, 43);
+      ctx.fillStyle = "#101a24";
+      ctx.fillRect(-8, -30, 16, 10);
+      ctx.strokeStyle = "#7beaff";
+      ctx.beginPath();
+      ctx.arc(0, -29, 7, Math.PI, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = "#a8bbc5";
+      ctx.beginPath();
+      ctx.moveTo(0, 19);
+      ctx.lineTo(0, 31);
+      ctx.moveTo(-9, 27);
+      ctx.lineTo(9, 27);
+      ctx.stroke();
+    } else if (object.type === "probe") {
+      ctx.fillStyle = "#c99c3f";
+      ctx.strokeStyle = "#ffe29b";
+      ctx.beginPath();
+      ctx.moveTo(0, -20);
+      ctx.lineTo(13, -5);
+      ctx.lineTo(9, 17);
+      ctx.lineTo(-9, 17);
+      ctx.lineTo(-13, -5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "#f3e6c3";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, -18, 17, 7, 0, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.lineTo(0, -32);
+      ctx.stroke();
+    } else if (object.type === "miner") {
+      ctx.fillStyle = "#6f7c84";
+      ctx.strokeStyle = "#d9e4ea";
+      ctx.fillRect(-22, -17, 44, 34);
+      ctx.strokeRect(-22, -17, 44, 34);
+      ctx.fillStyle = "#e4a33d";
+      ctx.fillRect(-16, -11, 32, 8);
+      for (const side of [-1, 1]) {
+        ctx.strokeStyle = "#9eafb8";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(side * 18, 8);
+        ctx.lineTo(side * 34, 22);
+        ctx.lineTo(side * 41, 10);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#d5dde1";
+      ctx.beginPath();
+      ctx.moveTo(-7, 17);
+      ctx.lineTo(0, 34);
+      ctx.lineTo(7, 17);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillStyle = "#bccbd2";
+      ctx.strokeStyle = "#f3fdff";
+      ctx.fillRect(-15, -13, 30, 26);
+      ctx.strokeRect(-15, -13, 30, 26);
+      ctx.strokeStyle = "#8fa5b2";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-28, -25);
+      ctx.lineTo(28, 25);
+      ctx.moveTo(28, -25);
+      ctx.lineTo(-28, 25);
+      ctx.stroke();
+      ctx.fillStyle = "#6fffd0";
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = `rgba(95, 255, 218, ${pulse})`;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "#5dffd8";
+    ctx.beginPath();
+    ctx.arc(9, -11, 2.2, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.rotate(-object.rotation);
+    ctx.fillStyle = "#b8fff0";
+    ctx.font = "800 7px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(object.label, 0, -43);
     ctx.restore();
   }
 
@@ -2684,15 +3091,27 @@
       fireRate: "#ff9f45",
       wideShot: "#56f4ff",
       shield: "#63b8ff",
+      shieldOvercharge: "#9bdcff",
+      shieldRepair: "#79c9ff",
       engine: "#ff9d4a",
       maneuver: "#46e6ff",
       armor: "#c6d2dc",
+      armorRepair: "#eef8ff",
+      hullRepair: "#52ff9b",
       regeneration: "#52ff9b",
+      magnet: "#5dffd8",
+      ricochet: "#71f7ff",
+      cloak: "#d58cff",
+      rapidFire: "#ff4f71",
       missile: "#ff8345",
       plasma: "#b56cff",
       railgun: "#ffe36e",
     };
-    const glyphs = { fireRate: "F", wideShot: "W", shield: "S", engine: "E", maneuver: "T", armor: "A", regeneration: "+", missile: "M", plasma: "P", railgun: "R" };
+    const glyphs = {
+      fireRate: "F", wideShot: "W", shield: "S", shieldOvercharge: "O", shieldRepair: "S+",
+      engine: "E", maneuver: "T", armor: "A", armorRepair: "A+", hullRepair: "H+", regeneration: "+",
+      magnet: "C", ricochet: "↗", cloak: "Ø", rapidFire: "⚡", missile: "M", plasma: "P", railgun: "R",
+    };
     const color = colors[pickup.type];
     const pulse = 1 + Math.sin(pickup.phase * 2) * 0.1;
     ctx.save();
@@ -2718,7 +3137,7 @@
     ctx.stroke();
     ctx.rotate(-pickup.phase * 0.45);
     ctx.fillStyle = color;
-    ctx.font = "900 12px ui-monospace, monospace";
+    ctx.font = `900 ${glyphs[pickup.type].length > 1 ? 9 : 12}px ui-monospace, monospace`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(glyphs[pickup.type], 0, 0);
@@ -2760,10 +3179,11 @@
     ctx.save();
     ctx.translate(ship.x, ship.y);
     if (ship.invulnerable > 0 && Math.floor(ship.invulnerable * 16) % 2 === 0) ctx.globalAlpha = 0.38;
+    if (cloakTimer > 0) ctx.globalAlpha = 0.16 + Math.sin(elapsed * 11) * 0.045;
 
-    const totalTier = upgrades.fireRate + upgrades.wideShot + upgrades.shield + upgrades.engine + upgrades.maneuver + upgrades.armor + upgrades.regeneration + upgrades.missile + upgrades.plasma + upgrades.railgun;
+    const totalTier = upgrades.fireRate + upgrades.wideShot + upgrades.shield + upgrades.shieldOvercharge + upgrades.engine + upgrades.maneuver + upgrades.armor + upgrades.regeneration + upgrades.magnet + upgrades.ricochet + upgrades.cloak + upgrades.missile + upgrades.plasma + upgrades.railgun;
     const wingSpan = 31 + upgrades.wideShot * 3 + Math.min(4, totalTier * 0.25);
-    const shieldRadius = 39 + upgrades.shield * 3;
+    const shieldRadius = 39 + upgrades.shield * 3 + upgrades.shieldOvercharge * 2;
     const weaponColor = { laser: "#56f4ff", missile: "#ff8345", plasma: "#b56cff", railgun: "#ffe36e" }[weapon];
 
     if (shield > 0) {
@@ -2787,6 +3207,21 @@
       ctx.beginPath();
       ctx.arc(0, 0, shieldRadius, 0, TAU);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    if (upgrades.magnet > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = `rgba(93, 255, 216, ${0.16 + upgrades.magnet * 0.06})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 8]);
+      ctx.lineDashOffset = elapsed * 22;
+      for (let level = 0; level < upgrades.magnet; level += 1) {
+        ctx.beginPath();
+        ctx.arc(0, 2, 33 + level * 5, -2.72, -0.42);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -3003,6 +3438,18 @@
       ctx.fill();
     }
 
+    // Overcharge capacitors add brighter shield rings behind the generator nodes.
+    for (let i = 0; i < upgrades.shieldOvercharge; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      ctx.strokeStyle = "#d8f5ff";
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#63b8ff";
+      ctx.beginPath();
+      ctx.arc(side * (18 + row * 8), 7 + row * 4, 4.2, 0, TAU);
+      ctx.stroke();
+    }
+
     // Engine upgrades install larger orange drive vanes around the nacelles.
     for (let i = 0; i < upgrades.engine; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
@@ -3068,6 +3515,55 @@
       ctx.moveTo(side * (3 + row * 3), -4 + row * 5);
       ctx.lineTo(side * (10 + row * 4), 7 + row * 4);
       ctx.lineTo(side * (16 + row * 5), 9 + row * 3);
+      ctx.stroke();
+    }
+
+    // Magnetic capture coils and ricochet prisms remain visible after installation.
+    for (let i = 0; i < upgrades.magnet; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      ctx.strokeStyle = "#5dffd8";
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = "#5dffd8";
+      ctx.beginPath();
+      ctx.arc(side * (10 + row * 8), 14 - row * 5, 3.2, 0, TAU);
+      ctx.stroke();
+    }
+    for (let i = 0; i < upgrades.ricochet; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const x = side * (24 + Math.floor(i / 2) * 7);
+      ctx.fillStyle = "#d8ffff";
+      ctx.strokeStyle = "#71f7ff";
+      ctx.shadowBlur = 9;
+      ctx.shadowColor = "#71f7ff";
+      ctx.beginPath();
+      ctx.moveTo(x, -3);
+      ctx.lineTo(x + side * 4, 3);
+      ctx.lineTo(x - side * 3, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    for (let i = 0; i < upgrades.cloak; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      ctx.fillStyle = "#d58cff";
+      ctx.shadowBlur = cloakTimer > 0 ? 18 : 7;
+      ctx.shadowColor = "#b56cff";
+      ctx.beginPath();
+      ctx.arc(side * (7 + row * 7), -9 + row * 7, 2.2, 0, TAU);
+      ctx.fill();
+    }
+    if (rapidFireTimer > 0) {
+      ctx.strokeStyle = "#ff5575";
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = "#ff335f";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-10, 2);
+      ctx.lineTo(-17, 8);
+      ctx.moveTo(10, 2);
+      ctx.lineTo(17, 8);
       ctx.stroke();
     }
 
@@ -3423,6 +3919,9 @@
       sfxVoice({ start: 310, end: 1320, duration: 0.34, volume: 0.13, shape: "sine" });
       sfxVoice({ start: 620, end: 1680, duration: 0.27, volume: 0.07, shape: "triangle", pan: 0.35 });
       sfxVoice({ start: 480, end: 1180, duration: 0.3, volume: 0.06, shape: "triangle", pan: -0.35 });
+    } else if (type === "ricochet") {
+      sfxVoice({ start: 980, end: 1780, duration: 0.09, volume: 0.065, shape: "triangle", pan: random(-0.5, 0.5) });
+      sfxVoice({ start: 1960, end: 820, duration: 0.07, volume: 0.035, shape: "sine", delay: 0.025 });
     } else if (type === "upgrade" || type === "complete") {
       const notes = type === "complete" ? [392, 523.25, 659.25, 783.99] : [293.66, 440, 587.33];
       notes.forEach((note, index) => {
