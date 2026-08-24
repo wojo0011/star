@@ -220,9 +220,15 @@ button {
   transition: width 180ms ease, background-color 180ms ease;
 }
 
-.shield-heading {
+.shield-heading,
+.armor-heading,
+.hull-heading {
   margin-top: 7px;
   margin-bottom: 4px;
+}
+
+.shield-heading {
+  margin-top: 0;
 }
 
 .shield-heading strong {
@@ -237,6 +243,24 @@ button {
   width: 0;
   background: #63b8ff;
   box-shadow: 0 0 13px rgba(99, 184, 255, 0.9);
+}
+
+.armor-heading strong {
+  color: #d8e4ec;
+}
+
+.armor-track {
+  height: 3px;
+}
+
+.armor-track span {
+  width: 0;
+  background: linear-gradient(90deg, #8295a3, #eef8ff);
+  box-shadow: 0 0 11px rgba(200, 224, 238, 0.72);
+}
+
+.hull-heading strong {
+  color: var(--safe);
 }
 
 .hud-actions {
@@ -907,6 +931,12 @@ button {
   color: #f2d47a;
 }
 
+.fabricator-note {
+  margin: -1px 0 8px;
+  color: rgba(213, 233, 241, 0.68);
+  font: 600 0.52rem/1.45 ui-monospace, monospace;
+}
+
 .fabricator-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1064,6 +1094,15 @@ kbd {
   background: #f7e4a6;
   border-color: #fff7dc;
   box-shadow: 0 0 11px #63c9ff;
+}
+
+.radar-dot.equipment-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 1px;
+  background: #6fffd0;
+  border-color: #d9fff5;
+  box-shadow: 0 0 10px #4fffc8;
 }
 
 .radar-dot.hostile-dot {
