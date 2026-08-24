@@ -557,6 +557,20 @@ button {
   justify-content: space-between;
 }
 
+.config-shortcut {
+  margin-left: auto;
+  margin-right: 7px;
+  color: var(--muted);
+  font-size: 0.43rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.config-shortcut kbd {
+  min-width: 24px;
+  padding: 2px 4px;
+}
+
 .config-heading button {
   width: 24px;
   height: 24px;
@@ -818,6 +832,29 @@ kbd {
   box-shadow: 0 0 7px #ff365c;
 }
 
+.radar-dot.planet-dot {
+  width: 7px;
+  height: 7px;
+  background: #74cfff;
+  border: 1px solid rgba(214, 247, 255, 0.9);
+  box-shadow: 0 0 10px #45a9ff;
+}
+
+.radar-dot.hostile-dot {
+  width: 5px;
+  height: 5px;
+  background: #ff4f9c;
+  box-shadow: 0 0 9px #ff2d72;
+}
+
+.radar-dot.hostile-dot.station-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #ffb548;
+  box-shadow: 0 0 11px #ff7045;
+}
+
 @keyframes sweep {
   to { transform: rotate(360deg); }
 }
@@ -952,6 +989,14 @@ kbd {
 
 .final-score {
   margin: 8px 0 28px;
+}
+
+.game-overlay > .game-over-reason {
+  margin: 5px 0 12px;
+  color: var(--danger);
+  font: 800 0.58rem ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .final-score span {
