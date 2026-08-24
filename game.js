@@ -42,6 +42,8 @@
     musicVolumeValue: document.getElementById("musicVolumeValue"),
     sfxVolume: document.getElementById("sfxVolume"),
     sfxVolumeValue: document.getElementById("sfxVolumeValue"),
+    audioStatus: document.getElementById("audioStatus"),
+    audioStatusText: document.getElementById("audioStatusText"),
   };
 
   const TAU = Math.PI * 2;
@@ -182,6 +184,14 @@
   } catch {
     localStorage.removeItem("starfall-settings-v1");
   }
+  if (localStorage.getItem("starfall-audio-engine-v2") !== "enabled") {
+    settings.music = true;
+    settings.soundFx = true;
+    settings.musicVolume = 0.72;
+    settings.sfxVolume = 0.9;
+    localStorage.setItem("starfall-audio-engine-v2", "enabled");
+    localStorage.setItem("starfall-settings-v1", JSON.stringify(settings));
+  }
 
   let width = window.innerWidth;
   let height = window.innerHeight;
@@ -208,8 +218,14 @@
   let soundEnabled = settings.soundFx;
   let audioContext = null;
   let musicBus = null;
-  let musicInterval = 0;
-  let musicStep = 0;
+  let sfxBus = null;
+  let audioMaster = null;
+  let musicSource = null;
+  let musicStartedAt = 0;
+  let musicOffset = 0;
+  let currentMusicTrack = null;
+  let noiseBuffer = null;
+  const musicBuffers = new Map();
   let radarClock = 0;
   let mobileFiring = false;
   let asteroidSequence = 0;
@@ -388,6 +404,7 @@
   function startMissionOne() {
     if (state === "running") return;
     unlockAudio();
+    resetMissionMusic();
     mission = 1;
     resetGame();
     spawnEarthDeparture();
@@ -434,6 +451,7 @@
   function startMissionTwo(preserveProgress = true) {
     if (state === "running" && mission === 2) return;
     unlockAudio();
+    resetMissionMusic();
     if (preserveProgress) clearSectorForMissionTwo();
     else resetGame();
     mission = 2;
@@ -539,11 +557,17 @@
     settings[key] = clamp(Number(value), 0, 1);
     localStorage.setItem("starfall-settings-v1", JSON.stringify(settings));
     updateSettingsUi();
-    if (key === "musicVolume" && audioContext && musicBus && state === "running") {
+    if (key === "musicVolume" && audioContext && musicBus) {
       const now = audioContext.currentTime;
       musicBus.gain.cancelScheduledValues(now);
-      musicBus.gain.linearRampToValueAtTime(Math.max(0.0001, settings.musicVolume), now + 0.08);
+      musicBus.gain.linearRampToValueAtTime(state === "running" && settings.music ? Math.max(0.0001, settings.musicVolume) : 0.0001, now + 0.08);
     }
+    if (key === "sfxVolume" && audioContext && sfxBus) {
+      const now = audioContext.currentTime;
+      sfxBus.gain.cancelScheduledValues(now);
+      sfxBus.gain.linearRampToValueAtTime(Math.max(0.0001, settings.sfxVolume), now + 0.08);
+    }
+    refreshAudioStatus();
   }
 
   function setFeatureSetting(key, enabled) {
@@ -578,6 +602,7 @@
     updateSettingsUi();
     if (key === "music") unlockAudio();
     updateMusicState();
+    refreshAudioStatus();
     ui.announcer.textContent = `${key.replace(/([A-Z])/g, " $1")} ${enabled ? "enabled" : "disabled"}`;
   }
 
@@ -3084,113 +3109,340 @@
     ctx.restore();
   }
 
+  function setAudioStatus(message, status = "ready") {
+    ui.audioStatus.dataset.state = status;
+    ui.audioStatusText.textContent = message;
+  }
+
+  function refreshAudioStatus() {
+    if (!audioContext) {
+      setAudioStatus("AUDIO LOCKED · PRESS ENABLE", "locked");
+    } else if (audioContext.state === "suspended") {
+      setAudioStatus("BROWSER AUDIO SUSPENDED · PRESS ENABLE", "locked");
+    } else if (!settings.music && !settings.soundFx) {
+      setAudioStatus("MUSIC AND SOUND FX MUTED", "muted");
+    } else if (musicSource && settings.music && state === "running") {
+      setAudioStatus(`${mission === 1 ? "SOLAR ESCAPE" : "DEEP SPACE"} SCORE PLAYING`, "playing");
+    } else {
+      setAudioStatus("AUDIO ENGINE READY", "ready");
+    }
+  }
+
   function unlockAudio() {
     if (!audioContext) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        audioContext = new AudioCtx();
-        musicBus = audioContext.createGain();
-        musicBus.gain.setValueAtTime(0.0001, audioContext.currentTime);
-        musicBus.connect(audioContext.destination);
+      if (!AudioCtx) {
+        setAudioStatus("WEB AUDIO NOT SUPPORTED", "muted");
+        return null;
+      }
+      audioContext = new AudioCtx();
+      audioMaster = audioContext.createDynamicsCompressor();
+      audioMaster.threshold.setValueAtTime(-12, audioContext.currentTime);
+      audioMaster.knee.setValueAtTime(18, audioContext.currentTime);
+      audioMaster.ratio.setValueAtTime(4, audioContext.currentTime);
+      audioMaster.attack.setValueAtTime(0.004, audioContext.currentTime);
+      audioMaster.release.setValueAtTime(0.24, audioContext.currentTime);
+      musicBus = audioContext.createGain();
+      sfxBus = audioContext.createGain();
+      musicBus.gain.setValueAtTime(Math.max(0.0001, settings.musicVolume), audioContext.currentTime);
+      sfxBus.gain.setValueAtTime(Math.max(0.0001, settings.sfxVolume), audioContext.currentTime);
+      musicBus.connect(audioMaster);
+      sfxBus.connect(audioMaster);
+      audioMaster.connect(audioContext.destination);
+    }
+    if (audioContext.state === "suspended") {
+      const resumed = audioContext.resume();
+      if (resumed?.then) {
+        resumed.then(() => {
+          refreshAudioStatus();
+          updateMusicState();
+        }).catch(() => setAudioStatus("AUDIO BLOCKED · PRESS ENABLE AGAIN", "locked"));
       }
     }
-    if (audioContext?.state === "suspended") audioContext.resume();
+    refreshAudioStatus();
+    return audioContext;
   }
 
-  function playMissionMusicChord() {
-    if (!audioContext || !musicBus || !settings.music || state !== "running") return;
-    const progression = [
-      [55, 82.41, 110],
-      [46.25, 69.3, 92.5],
-      [49, 73.42, 98],
-      [41.2, 61.74, 82.41],
-    ];
-    const chord = progression[musicStep % progression.length];
-    const now = audioContext.currentTime;
-    musicStep += 1;
-    chord.forEach((frequency, index) => {
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      oscillator.type = index === 0 ? "sine" : "triangle";
-      oscillator.frequency.setValueAtTime(frequency, now);
-      oscillator.detune.setValueAtTime(index === 2 ? 5 : index === 1 ? -4 : 0, now);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(index === 0 ? 0.055 : 0.026, now + 0.45);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.15);
-      oscillator.connect(gain).connect(musicBus);
-      oscillator.start(now);
-      oscillator.stop(now + 3.2);
-    });
-    const signal = audioContext.createOscillator();
-    const signalGain = audioContext.createGain();
-    signal.type = "sine";
-    signal.frequency.setValueAtTime(chord[1] * 4, now + 1.05);
-    signalGain.gain.setValueAtTime(0.0001, now);
-    signalGain.gain.linearRampToValueAtTime(0.018, now + 1.12);
-    signalGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.72);
-    signal.connect(signalGain).connect(musicBus);
-    signal.start(now + 1.05);
-    signal.stop(now + 1.75);
+  function renderMusicTrack(trackId) {
+    if (!audioContext) return null;
+    if (musicBuffers.has(trackId)) return musicBuffers.get(trackId);
+    const solar = trackId === "solar";
+    const sampleRate = 12000;
+    const bpm = solar ? 96 : 74;
+    const beat = 60 / bpm;
+    const bars = 8;
+    const duration = bars * 4 * beat;
+    const length = Math.ceil(duration * sampleRate);
+    const left = new Float32Array(length);
+    const right = new Float32Array(length);
+    const sineTable = new Float32Array(4096);
+    for (let i = 0; i < sineTable.length; i += 1) sineTable[i] = Math.sin((i / sineTable.length) * TAU);
+    const waveAt = (cycles) => sineTable[Math.floor(cycles * sineTable.length) & 4095];
+    let seed = solar ? 0x5f3759df : 0x1f123bb5;
+    const noise = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return (seed / 0xffffffff) * 2 - 1;
+    };
+    const panGains = (pan) => [Math.sqrt((1 - pan) * 0.5), Math.sqrt((1 + pan) * 0.5)];
+    const addVoice = (start, voiceDuration, frequency, amplitude, voice = "pad", pan = 0, attack = 0.03, release = 0.2) => {
+      const first = Math.max(0, Math.floor(start * sampleRate));
+      const count = Math.min(length - first, Math.floor(voiceDuration * sampleRate));
+      const [leftGain, rightGain] = panGains(pan);
+      for (let i = 0; i < count; i += 1) {
+        const t = i / sampleRate;
+        const fadeIn = Math.min(1, t / Math.max(0.001, attack));
+        const fadeOut = Math.min(1, (voiceDuration - t) / Math.max(0.001, release));
+        const rawEnvelope = Math.max(0, Math.min(fadeIn, fadeOut));
+        const envelope = rawEnvelope * rawEnvelope * (3 - 2 * rawEnvelope);
+        const cycles = frequency * t;
+        let sample;
+        if (voice === "pad") sample = waveAt(cycles + waveAt(t * 0.11) * 0.025) + waveAt(cycles * 2.003) * 0.28 + waveAt(cycles * 3.997) * 0.09;
+        else if (voice === "bass") sample = waveAt(cycles) + waveAt(cycles * 0.5) * 0.34 + waveAt(cycles * 2) * 0.18;
+        else if (voice === "glass") sample = waveAt(cycles) + waveAt(cycles * 2.01) * 0.46 + waveAt(cycles * 4.02) * 0.15;
+        else if (voice === "lead") sample = waveAt(cycles + waveAt(t * 0.83) * 0.035) + waveAt(cycles * 2) * 0.2;
+        else sample = waveAt(cycles);
+        const value = sample * amplitude * envelope;
+        left[first + i] += value * leftGain;
+        right[first + i] += value * rightGain;
+      }
+    };
+    const addNoise = (start, noiseDuration, amplitude, pan = 0, decay = 8) => {
+      const first = Math.max(0, Math.floor(start * sampleRate));
+      const count = Math.min(length - first, Math.floor(noiseDuration * sampleRate));
+      const [leftGain, rightGain] = panGains(pan);
+      let previous = 0;
+      for (let i = 0; i < count; i += 1) {
+        const t = i / sampleRate;
+        previous = previous * 0.62 + noise() * 0.38;
+        const value = previous * amplitude * Math.exp(-t * decay);
+        left[first + i] += value * leftGain;
+        right[first + i] += value * rightGain;
+      }
+    };
+    const addKick = (start, amplitude) => {
+      const first = Math.floor(start * sampleRate);
+      const count = Math.min(length - first, Math.floor(0.42 * sampleRate));
+      let phase = 0;
+      for (let i = 0; i < count; i += 1) {
+        const t = i / sampleRate;
+        const frequency = 42 + 96 * Math.exp(-t * 18);
+        phase += TAU * frequency / sampleRate;
+        const value = Math.sin(phase) * amplitude * Math.exp(-t * 10);
+        left[first + i] += value * 0.72;
+        right[first + i] += value * 0.72;
+      }
+    };
+    const solarRoots = [73.42, 58.27, 87.31, 65.41, 73.42, 58.27, 65.41, 55, 73.42, 87.31, 58.27, 55];
+    const deepRoots = [46.25, 38.89, 43.65, 34.65, 46.25, 51.91, 38.89, 41.2, 46.25, 34.65, 38.89, 41.2];
+    const roots = solar ? solarRoots : deepRoots;
+    const melody = solar ? [0, 3, 7, 10, 7, 12, 10, 7, 3, 7, 5, 3, 0, -2, 0, 3] : [0, 1, 7, 5, 1, 8, 7, 0, -5, 1, 3, 1, 0, -4, -5, -7];
+    for (let bar = 0; bar < bars; bar += 1) {
+      const barStart = bar * beat * 4;
+      const root = roots[bar];
+      const major = solar && [2, 3, 6, 9].includes(bar);
+      const chord = major ? [1, 1.2599, 1.4983, 2.2449] : [1, 1.1892, 1.4983, 2.2449];
+      const padDuration = beat * (bar === bars - 1 ? 4 : 4.35);
+      chord.forEach((ratio, index) => addVoice(barStart, padDuration, root * ratio * 2, solar ? 0.052 : 0.062, "pad", (index - 1.5) * 0.34, beat * 0.9, bar === bars - 1 ? beat * 0.72 : beat * 1.25));
+      for (let pulse = 0; pulse < 4; pulse += 1) {
+        addVoice(barStart + pulse * beat, beat * 0.82, root * (pulse % 2 === 0 ? 1 : 1.4983), solar ? 0.13 : 0.1, "bass", pulse % 2 ? 0.12 : -0.12, 0.012, beat * 0.34);
+      }
+      for (let step = 0; step < 8; step += 1) {
+        const ratio = chord[step % chord.length];
+        addVoice(barStart + step * beat * 0.5, beat * (solar ? 0.31 : 0.44), root * ratio * 4, solar ? 0.052 : 0.034, "glass", step % 2 ? 0.48 : -0.48, 0.008, beat * 0.18);
+      }
+      if (solar || bar % 2 === 0) {
+        for (let phrase = 0; phrase < 4; phrase += 1) {
+          const offset = melody[(bar * 4 + phrase) % melody.length];
+          addVoice(barStart + phrase * beat, beat * 0.72, root * 4 * 2 ** (offset / 12), solar ? 0.065 : 0.045, "lead", Math.sin((bar + phrase) * 1.7) * 0.36, 0.04, beat * 0.3);
+        }
+      }
+      for (let pulse = 0; pulse < 4; pulse += 1) {
+        if (solar ? pulse % 2 === 0 : pulse === 0) addKick(barStart + pulse * beat, solar ? 0.34 : 0.24);
+        if (solar && pulse % 2 === 1) addNoise(barStart + pulse * beat, 0.18, 0.14, pulse === 1 ? -0.16 : 0.16, 18);
+        addNoise(barStart + pulse * beat + beat * 0.5, solar ? 0.065 : 0.11, solar ? 0.045 : 0.025, pulse % 2 ? 0.66 : -0.66, solar ? 34 : 16);
+      }
+    }
+    for (let i = 0; i < length; i += 1) {
+      const leftValue = left[i] * 1.15;
+      const rightValue = right[i] * 1.15;
+      left[i] = (leftValue / (1 + Math.abs(leftValue))) * 0.9;
+      right[i] = (rightValue / (1 + Math.abs(rightValue))) * 0.9;
+    }
+    const buffer = audioContext.createBuffer(2, length, sampleRate);
+    buffer.copyToChannel(left, 0);
+    buffer.copyToChannel(right, 1);
+    musicBuffers.set(trackId, buffer);
+    return buffer;
   }
 
-  function stopMissionMusic() {
-    if (musicInterval) {
-      window.clearInterval(musicInterval);
-      musicInterval = 0;
+  function stopMissionMusic(preservePosition = true) {
+    if (musicSource && audioContext) {
+      if (preservePosition && musicSource.buffer?.duration) {
+        musicOffset = (musicOffset + audioContext.currentTime - musicStartedAt) % musicSource.buffer.duration;
+      }
+      try { musicSource.stop(); } catch {}
+      musicSource.disconnect?.();
+      musicSource = null;
     }
     if (audioContext && musicBus) {
       const now = audioContext.currentTime;
       musicBus.gain.cancelScheduledValues(now);
       musicBus.gain.setValueAtTime(Math.max(0.0001, musicBus.gain.value), now);
-      musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
     }
+    refreshAudioStatus();
+  }
+
+  function resetMissionMusic() {
+    stopMissionMusic(false);
+    musicOffset = 0;
+    currentMusicTrack = null;
+  }
+
+  function startMissionMusic() {
+    if (!audioContext || !musicBus || !settings.music || state !== "running") return;
+    const trackId = mission === 1 ? "solar" : "deep";
+    if (musicSource && currentMusicTrack === trackId) return;
+    if (musicSource) stopMissionMusic(currentMusicTrack === trackId);
+    if (currentMusicTrack !== trackId) musicOffset = 0;
+    const buffer = renderMusicTrack(trackId);
+    if (!buffer) return;
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(musicBus);
+    const now = audioContext.currentTime;
+    musicBus.gain.cancelScheduledValues(now);
+    musicBus.gain.setValueAtTime(0.0001, now);
+    musicBus.gain.linearRampToValueAtTime(Math.max(0.0001, settings.musicVolume), now + 0.42);
+    source.start(0, musicOffset % buffer.duration);
+    musicStartedAt = now;
+    musicSource = source;
+    currentMusicTrack = trackId;
+    refreshAudioStatus();
   }
 
   function updateMusicState() {
-    if (!audioContext || !musicBus || !settings.music || state !== "running") {
-      stopMissionMusic();
+    if (!audioContext || !musicBus || audioContext.state === "suspended" || !settings.music || state !== "running") {
+      stopMissionMusic(true);
       return;
     }
-    if (musicInterval) return;
-    const now = audioContext.currentTime;
-    musicBus.gain.cancelScheduledValues(now);
-    musicBus.gain.setValueAtTime(Math.max(0.0001, musicBus.gain.value), now);
-    musicBus.gain.linearRampToValueAtTime(Math.max(0.0001, settings.musicVolume), now + 0.35);
-    playMissionMusicChord();
-    musicInterval = window.setInterval(playMissionMusicChord, 2600);
+    startMissionMusic();
+  }
+
+  function getNoiseBuffer() {
+    if (noiseBuffer || !audioContext) return noiseBuffer;
+    const length = Math.floor(audioContext.sampleRate * 2);
+    noiseBuffer = audioContext.createBuffer(1, length, audioContext.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < data.length; i += 1) {
+      last = last * 0.12 + (Math.random() * 2 - 1) * 0.88;
+      data[i] = last;
+    }
+    return noiseBuffer;
+  }
+
+  function sfxVoice({ start = 440, end = start, duration = 0.2, volume = 0.1, shape = "sine", delay = 0, pan = 0, attack = 0.006 }) {
+    if (!audioContext || !sfxBus) return;
+    const now = audioContext.currentTime + delay;
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.type = shape;
+    oscillator.frequency.setValueAtTime(Math.max(1, start), now);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, end), now + duration);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(Math.max(0.0001, volume), now + Math.min(attack, duration * 0.35));
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    oscillator.connect(gain);
+    if (audioContext.createStereoPanner) {
+      const panner = audioContext.createStereoPanner();
+      panner.pan.setValueAtTime(clamp(pan, -1, 1), now);
+      gain.connect(panner).connect(sfxBus);
+    } else gain.connect(sfxBus);
+    oscillator.start(now);
+    oscillator.stop(now + duration + 0.03);
+  }
+
+  function sfxNoise({ duration = 0.25, volume = 0.1, frequency = 1200, endFrequency = frequency, filterType = "lowpass", delay = 0, pan = 0 }) {
+    if (!audioContext || !sfxBus) return;
+    const now = audioContext.currentTime + delay;
+    const source = audioContext.createBufferSource();
+    const filter = audioContext.createBiquadFilter();
+    const gain = audioContext.createGain();
+    source.buffer = getNoiseBuffer();
+    filter.type = filterType;
+    filter.frequency.setValueAtTime(Math.max(20, frequency), now);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), now + duration);
+    filter.Q.setValueAtTime(filterType === "bandpass" ? 2.8 : 0.7, now);
+    gain.gain.setValueAtTime(Math.max(0.0001, volume), now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    source.connect(filter).connect(gain);
+    if (audioContext.createStereoPanner) {
+      const panner = audioContext.createStereoPanner();
+      panner.pan.setValueAtTime(clamp(pan, -1, 1), now);
+      gain.connect(panner).connect(sfxBus);
+    } else gain.connect(sfxBus);
+    const maxOffset = Math.max(0, noiseBuffer.duration - duration - 0.02);
+    source.start(now, Math.random() * maxOffset, duration);
+    source.stop(now + duration + 0.03);
   }
 
   function playTone(type, strength = 1) {
-    if (!soundEnabled || !audioContext) return;
-    const now = audioContext.currentTime;
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    const toneSettings = {
-      laser: [760, 240, 0.075, "sawtooth", 0.025],
-      missile: [150, 70, 0.18, "square", 0.035],
-      plasma: [420, 105, 0.22, "sine", 0.045],
-      railgun: [1050, 72, 0.16, "sawtooth", 0.05],
-      impact: [90, 34, 0.16 * strength, "sawtooth", 0.04],
-      explosion: [74, 24, 0.6, "sawtooth", 0.06],
-      damage: [120, 45, 0.28, "square", 0.05],
-      shield: [260, 620, 0.15, "sine", 0.025],
-      upgrade: [290, 880, 0.32, "triangle", 0.035],
-      resource: [510, 740, 0.11, "sine", 0.022],
-      switch: [330, 520, 0.06, "sine", 0.018],
-      enemy: [210, 118, 0.14, "sawtooth", 0.022],
-      launch: [110, 720, 0.55, "sawtooth", 0.045],
-      complete: [392, 1175, 0.7, "triangle", 0.04],
-    }[type];
-    if (!toneSettings) return;
-    const [start, end, duration, shape, volume] = toneSettings;
-    oscillator.type = shape;
-    oscillator.frequency.setValueAtTime(start, now);
-    oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, end), now + duration);
-    gain.gain.setValueAtTime(Math.max(0.0001, volume * settings.sfxVolume * 2.1), now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    oscillator.connect(gain).connect(audioContext.destination);
-    oscillator.start(now);
-    oscillator.stop(now + duration + 0.02);
+    if (!soundEnabled || !audioContext || !sfxBus) return;
+    const power = clamp(strength, 0.45, 2.5);
+    if (type === "laser") {
+      sfxVoice({ start: 1450, end: 190, duration: 0.15, volume: 0.12, shape: "sawtooth", pan: random(-0.18, 0.18) });
+      sfxVoice({ start: 2100, end: 620, duration: 0.09, volume: 0.055, shape: "sine", delay: 0.012 });
+      sfxNoise({ duration: 0.055, volume: 0.035, frequency: 4200, endFrequency: 1200, filterType: "highpass" });
+    } else if (type === "missile") {
+      sfxVoice({ start: 128, end: 42, duration: 0.48, volume: 0.19, shape: "sine" });
+      sfxVoice({ start: 360, end: 72, duration: 0.28, volume: 0.075, shape: "square" });
+      sfxNoise({ duration: 0.42, volume: 0.15, frequency: 1500, endFrequency: 110, filterType: "bandpass" });
+    } else if (type === "plasma") {
+      sfxVoice({ start: 520, end: 88, duration: 0.34, volume: 0.17, shape: "sine" });
+      sfxVoice({ start: 1040, end: 210, duration: 0.27, volume: 0.09, shape: "triangle", delay: 0.018, pan: 0.24 });
+      sfxNoise({ duration: 0.22, volume: 0.07, frequency: 2200, endFrequency: 340, filterType: "bandpass", pan: -0.24 });
+    } else if (type === "railgun") {
+      sfxNoise({ duration: 0.15, volume: 0.24, frequency: 6000, endFrequency: 180, filterType: "bandpass" });
+      sfxVoice({ start: 1900, end: 58, duration: 0.24, volume: 0.18, shape: "square" });
+      sfxVoice({ start: 105, end: 31, duration: 0.55, volume: 0.2, shape: "sine" });
+      sfxVoice({ start: 760, end: 120, duration: 0.21, volume: 0.075, shape: "sawtooth", delay: 0.11, pan: 0.4 });
+    } else if (type === "impact") {
+      sfxNoise({ duration: 0.22 * power, volume: 0.13 * power, frequency: 1800, endFrequency: 90, filterType: "lowpass" });
+      sfxVoice({ start: 105, end: 33, duration: 0.25 * power, volume: 0.13 * power, shape: "sine" });
+    } else if (type === "explosion") {
+      sfxNoise({ duration: 0.82, volume: 0.25 * power, frequency: 1300, endFrequency: 48, filterType: "lowpass" });
+      sfxNoise({ duration: 0.18, volume: 0.16 * power, frequency: 5200, endFrequency: 520, filterType: "highpass" });
+      sfxVoice({ start: 82, end: 24, duration: 0.72, volume: 0.23 * power, shape: "sine" });
+    } else if (type === "damage") {
+      sfxVoice({ start: 190, end: 62, duration: 0.3, volume: 0.16, shape: "square" });
+      sfxVoice({ start: 260, end: 92, duration: 0.22, volume: 0.11, shape: "sawtooth", delay: 0.12 });
+      sfxNoise({ duration: 0.26, volume: 0.12, frequency: 1800, endFrequency: 140, filterType: "bandpass" });
+    } else if (type === "shield") {
+      sfxVoice({ start: 310, end: 1320, duration: 0.34, volume: 0.13, shape: "sine" });
+      sfxVoice({ start: 620, end: 1680, duration: 0.27, volume: 0.07, shape: "triangle", pan: 0.35 });
+      sfxVoice({ start: 480, end: 1180, duration: 0.3, volume: 0.06, shape: "triangle", pan: -0.35 });
+    } else if (type === "upgrade" || type === "complete") {
+      const notes = type === "complete" ? [392, 523.25, 659.25, 783.99] : [293.66, 440, 587.33];
+      notes.forEach((note, index) => {
+        sfxVoice({ start: note, end: note * 1.01, duration: type === "complete" ? 0.75 : 0.42, volume: 0.09, shape: "triangle", delay: index * (type === "complete" ? 0.17 : 0.09), pan: (index - 1.5) * 0.2 });
+        sfxVoice({ start: note * 2, end: note * 1.5, duration: 0.3, volume: 0.035, shape: "sine", delay: index * 0.09 });
+      });
+    } else if (type === "resource") {
+      [659.25, 880, 1174.66].forEach((note, index) => sfxVoice({ start: note, end: note * 1.02, duration: 0.19, volume: 0.065, shape: "sine", delay: index * 0.055, pan: index * 0.25 - 0.25 }));
+    } else if (type === "switch") {
+      sfxVoice({ start: 320, end: 720, duration: 0.075, volume: 0.075, shape: "sine" });
+      sfxVoice({ start: 680, end: 980, duration: 0.055, volume: 0.04, shape: "square", delay: 0.045 });
+    } else if (type === "enemy") {
+      sfxVoice({ start: 270, end: 82, duration: 0.2, volume: 0.1, shape: "sawtooth", pan: random(-0.55, 0.55) });
+      sfxNoise({ duration: 0.11, volume: 0.06, frequency: 2400, endFrequency: 380, filterType: "bandpass" });
+    } else if (type === "launch") {
+      sfxVoice({ start: 48, end: 122, duration: 1.15, volume: 0.2, shape: "sine" });
+      sfxVoice({ start: 96, end: 610, duration: 0.88, volume: 0.11, shape: "sawtooth", delay: 0.08 });
+      sfxNoise({ duration: 1.1, volume: 0.2, frequency: 180, endFrequency: 2400, filterType: "bandpass" });
+    }
+    refreshAudioStatus();
   }
 
   function frame(now) {
@@ -3282,9 +3534,13 @@
   });
   document.getElementById("testAudioButton").addEventListener("click", () => {
     unlockAudio();
+    if (!settings.music) setFeatureSetting("music", true);
     if (!settings.soundFx) setFeatureSetting("soundFx", true);
+    if (settings.musicVolume < 0.05) setVolumeSetting("musicVolume", 0.72);
     if (settings.sfxVolume < 0.05) setVolumeSetting("sfxVolume", 0.8);
     playTone("upgrade");
+    updateMusicState();
+    refreshAudioStatus();
     ui.announcer.textContent = "Audio test played.";
   });
 
@@ -3335,6 +3591,7 @@
   ui.highScore.textContent = padScore(highScore);
   resize();
   updateSettingsUi();
+  refreshAudioStatus();
   updateResourceUi();
   updateHud(true);
   requestAnimationFrame(frame);
