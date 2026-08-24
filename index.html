@@ -113,11 +113,12 @@
         </div>
         <div class="settings-group">
           <p class="eyebrow">AUDIO &amp; VISUAL</p>
-          <button class="setting-toggle" type="button" role="switch" data-setting="music"><span>MISSION MUSIC<small>Procedural ambient soundtrack</small></span></button>
+          <button class="setting-toggle" type="button" role="switch" data-setting="music"><span>MISSION MUSIC<small>Original rendered sci-fi score</small></span></button>
           <button class="setting-toggle" type="button" role="switch" data-setting="soundFx"><span>SOUND FX<small>Weapons, impacts and alerts</small></span></button>
           <label class="volume-control" for="musicVolume"><span>Music volume</span><output id="musicVolumeValue" for="musicVolume">65%</output><input id="musicVolume" data-volume="musicVolume" type="range" min="0" max="100" value="65" /></label>
           <label class="volume-control" for="sfxVolume"><span>Sound FX volume</span><output id="sfxVolumeValue" for="sfxVolume">80%</output><input id="sfxVolume" data-volume="sfxVolume" type="range" min="0" max="100" value="80" /></label>
-          <button id="testAudioButton" class="test-audio-button" type="button">TEST AUDIO</button>
+          <div id="audioStatus" class="audio-status" data-state="locked"><i></i><span id="audioStatusText">AUDIO LOCKED · PRESS ENABLE</span></div>
+          <button id="testAudioButton" class="test-audio-button" type="button">ENABLE / TEST AUDIO</button>
           <button class="setting-toggle" type="button" role="switch" data-setting="particles"><span>PARTICLE FX<small>Trails, sparks and explosions</small></span></button>
           <button class="setting-toggle" type="button" role="switch" data-setting="screenShake"><span>SCREEN SHAKE<small>Impact camera movement</small></span></button>
         </div>
