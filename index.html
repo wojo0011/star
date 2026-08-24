@@ -95,10 +95,32 @@
         <div id="upgradeList" class="upgrade-list">
           <span class="empty-upgrades">NO UPGRADES INSTALLED</span>
         </div>
+        <div class="resource-hold">
+          <div class="resource-heading">
+            <span>REFINED MATTER</span>
+            <strong><b id="matterValue">0</b> MU</strong>
+          </div>
+          <div id="resourceList" class="resource-list">
+            <span class="empty-resources">NO ELEMENTS RECOVERED</span>
+          </div>
+        </div>
+        <div class="fabricator">
+          <p class="eyebrow">FIELD FABRICATOR</p>
+          <div class="fabricator-grid">
+            <button type="button" data-fabricate="fireRate"><span>OVERDRIVE</span><small>8 MU</small></button>
+            <button type="button" data-fabricate="wideShot"><span>WIDE SHOT</span><small>10 MU</small></button>
+            <button type="button" data-fabricate="shield"><span>SHIELD</span><small>12 MU</small></button>
+            <button type="button" data-fabricate="repair"><span>HULL REPAIR</span><small>7 MU</small></button>
+            <button type="button" data-fabricate="engine"><span>ENGINE</span><small>10 MU</small></button>
+            <button type="button" data-fabricate="maneuver"><span>MANOEUVRE</span><small>9 MU</small></button>
+            <button type="button" data-fabricate="armor"><span>ARMOUR</span><small>14 MU</small></button>
+            <button type="button" data-fabricate="regeneration"><span>REGEN</span><small>16 MU</small></button>
+          </div>
+        </div>
       </section>
 
       <div id="upgradeToast" class="upgrade-toast" role="status" aria-live="polite">
-        <span>UPGRADE ACQUIRED</span>
+        <span id="upgradeToastKicker">UPGRADE ACQUIRED</span>
         <strong id="upgradeToastTitle">SYSTEM ENHANCED</strong>
       </div>
 
@@ -123,7 +145,7 @@
       <section id="startOverlay" class="game-overlay visible" aria-labelledby="startTitle">
         <div class="overlay-kicker"><span></span> FLIGHT SYSTEM READY <span></span></div>
         <h2 id="startTitle">ENTER THE<br /><em>STARFALL</em></h2>
-        <p>Launch with a basic laser, then recover weapons and upgrades in the field.<br />Missed asteroids pass safely—only direct collisions damage your ship.</p>
+        <p>Recover weapons, elemental resources and ship upgrades in the field.<br />Only direct collisions with asteroids or shooting stars damage your ship.</p>
         <button id="startButton" class="primary-button" type="button">
           <span>LAUNCH MISSION</span>
           <small>PRESS SPACE</small>
