@@ -7,6 +7,7 @@
     score: document.getElementById("scoreValue"),
     highScore: document.getElementById("highScoreValue"),
     wave: document.getElementById("waveValue"),
+    waveLabel: document.getElementById("waveLabel"),
     health: document.getElementById("healthValue"),
     healthBar: document.getElementById("healthBar"),
     shield: document.getElementById("shieldValue"),
@@ -16,6 +17,7 @@
     start: document.getElementById("startOverlay"),
     pause: document.getElementById("pauseOverlay"),
     gameOver: document.getElementById("gameOverOverlay"),
+    missionComplete: document.getElementById("missionCompleteOverlay"),
     gameOverReason: document.getElementById("gameOverReason"),
     finalScore: document.getElementById("finalScore"),
     announcer: document.getElementById("announcer"),
@@ -33,6 +35,13 @@
     settingsPopover: document.getElementById("settingsPopover"),
     matterValue: document.getElementById("matterValue"),
     resourceList: document.getElementById("resourceList"),
+    missionNumber: document.getElementById("missionNumber"),
+    missionObjective: document.getElementById("missionObjective"),
+    missionProgress: document.getElementById("missionProgress"),
+    musicVolume: document.getElementById("musicVolume"),
+    musicVolumeValue: document.getElementById("musicVolumeValue"),
+    sfxVolume: document.getElementById("sfxVolume"),
+    sfxVolumeValue: document.getElementById("sfxVolumeValue"),
   };
 
   const TAU = Math.PI * 2;
@@ -128,6 +137,22 @@
     { id: "volcanic", name: "Volcanic world", style: "volcanic", colors: ["#21191c", "#4b2929", "#ff5a24"], atmosphere: "#ff6338" },
     { id: "toxic", name: "Toxic world", style: "toxic", colors: ["#76933e", "#b2c75b", "#354729"], atmosphere: "#b8e75e" },
   ];
+  const solarBodyTypes = {
+    earth: { id: "earth", name: "Earth", colors: ["#176bb1", "#43a66c", "#eefcff"], atmosphere: "#64cfff" },
+    mars: { id: "mars", name: "Mars", colors: ["#a8492c", "#d47c51", "#6d2e23"], atmosphere: "#e68b64" },
+    jupiter: { id: "jupiter", name: "Jupiter", colors: ["#c89468", "#ead6b7", "#9b5b4d"], atmosphere: "#f3c78e" },
+    saturn: { id: "saturn", name: "Saturn", colors: ["#d7bd79", "#f1dfa8", "#a98955"], atmosphere: "#ffe2a0" },
+    uranus: { id: "uranus", name: "Uranus", colors: ["#81d6df", "#b8f0ee", "#4d9fb4"], atmosphere: "#a7f5ff" },
+    neptune: { id: "neptune", name: "Neptune", colors: ["#2455b9", "#4a8be1", "#182d75"], atmosphere: "#5597ff" },
+  };
+  const solarMissionEvents = [
+    { at: 7, id: "mars", side: 0.23, radius: 64, speed: 54 },
+    { at: 36, id: "jupiter", side: 0.78, radius: 142, speed: 51 },
+    { at: 49, id: "saturn", side: 0.24, radius: 112, speed: 55, rings: true },
+    { at: 61, id: "uranus", side: 0.77, radius: 76, speed: 58, rings: true },
+    { at: 71, id: "neptune", side: 0.27, radius: 82, speed: 61 },
+  ];
+  const SOLAR_MISSION_DURATION = 88;
   const alienShipTypes = [
     { id: "scout", name: "Alien scout", radius: 23, hp: 4, speed: 82, score: 420, color: "#ff5d9e" },
     { id: "raider", name: "Alien raider", radius: 29, hp: 7, speed: 66, score: 760, color: "#c86cff" },
@@ -144,12 +169,15 @@
     soundFx: true,
     particles: true,
     screenShake: true,
+    musicVolume: 0.65,
+    sfxVolume: 0.8,
   };
   const settings = { ...defaultSettings };
   try {
     const savedSettings = JSON.parse(localStorage.getItem("starfall-settings-v1") || "{}");
     for (const key of Object.keys(defaultSettings)) {
-      if (typeof savedSettings[key] === "boolean") settings[key] = savedSettings[key];
+      if (typeof defaultSettings[key] === "boolean" && typeof savedSettings[key] === "boolean") settings[key] = savedSettings[key];
+      if (typeof defaultSettings[key] === "number" && Number.isFinite(savedSettings[key])) settings[key] = clamp(savedSettings[key], 0, 1);
     }
   } catch {
     localStorage.removeItem("starfall-settings-v1");
@@ -160,6 +188,10 @@
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let lastTime = performance.now();
   let state = "idle";
+  let mission = 1;
+  let missionElapsed = 0;
+  let solarEventIndex = 0;
+  let beltAnnounced = false;
   let configReturnState = null;
   let settingsReturnState = null;
   let score = 0;
@@ -205,6 +237,7 @@
   const resourceDrops = [];
   const shootingStars = [];
   const planets = [];
+  const solarPlanets = [];
   const alienShips = [];
   const spaceStations = [];
   const enemyProjectiles = [];
@@ -292,6 +325,9 @@
     timeSinceDamage = 0;
     configReturnState = null;
     settingsReturnState = null;
+    missionElapsed = 0;
+    solarEventIndex = 0;
+    beltAnnounced = false;
     asteroids.length = 0;
     projectiles.length = 0;
     particles.length = 0;
@@ -300,6 +336,7 @@
     resourceDrops.length = 0;
     shootingStars.length = 0;
     planets.length = 0;
+    solarPlanets.length = 0;
     alienShips.length = 0;
     spaceStations.length = 0;
     enemyProjectiles.length = 0;
@@ -318,23 +355,115 @@
     updateHud(true);
   }
 
-  function startGame() {
-    if (state === "running") return;
-    unlockAudio();
-    resetGame();
+  function prepareRunningState() {
     state = "running";
     ui.start.classList.remove("visible");
     ui.pause.classList.remove("visible");
     ui.gameOver.classList.remove("visible");
+    ui.missionComplete.classList.remove("visible");
     setConfigOpen(false);
     setSettingsOpen(false);
-    ui.announcer.textContent = "Mission launched";
     lastTime = performance.now();
+    updateMissionHud();
     updateMusicState();
   }
 
+  function spawnEarthDeparture() {
+    const radius = clamp(Math.min(width, height) * 0.34, 180, 310);
+    solarPlanets.push({
+      type: solarBodyTypes.earth,
+      x: width / 2,
+      y: height + radius * 0.46,
+      radius,
+      vy: 19,
+      rotation: -0.18,
+      rotationSpeed: 0.018,
+      phase: 0,
+      rings: false,
+      collision: false,
+      label: "EARTH · DEPARTURE",
+    });
+  }
+
+  function startMissionOne() {
+    if (state === "running") return;
+    unlockAudio();
+    mission = 1;
+    resetGame();
+    spawnEarthDeparture();
+    prepareRunningState();
+    ui.announcer.textContent = "Mission one launched from Earth. Leave the Solar System.";
+    screenShake = 7;
+    playTone("launch");
+  }
+
+  function clearSectorForMissionTwo() {
+    for (const asteroid of asteroids) asteroid.alive = false;
+    for (const enemy of alienShips) enemy.alive = false;
+    for (const station of spaceStations) station.alive = false;
+    asteroids.length = 0;
+    projectiles.length = 0;
+    particles.length = 0;
+    shockwaves.length = 0;
+    powerUps.length = 0;
+    resourceDrops.length = 0;
+    shootingStars.length = 0;
+    planets.length = 0;
+    solarPlanets.length = 0;
+    alienShips.length = 0;
+    spaceStations.length = 0;
+    enemyProjectiles.length = 0;
+    elapsed = 0;
+    missionElapsed = 0;
+    spawnClock = 0;
+    shootingStarClock = 0;
+    planetClock = 0;
+    alienClock = 0;
+    stationClock = 0;
+    nextShootingStar = random(7, 12);
+    nextPlanet = random(24, 40);
+    nextAlien = random(10, 17);
+    nextStation = random(34, 55);
+    ship.x = width / 2;
+    ship.y = height * 0.82;
+    ship.vx = 0;
+    ship.vy = 0;
+    ship.invulnerable = 1.5;
+  }
+
+  function startMissionTwo(preserveProgress = true) {
+    if (state === "running" && mission === 2) return;
+    unlockAudio();
+    if (preserveProgress) clearSectorForMissionTwo();
+    else resetGame();
+    mission = 2;
+    prepareRunningState();
+    updateUpgradeUi();
+    updateResourceUi();
+    updateHud(true);
+    ui.announcer.textContent = "Mission two launched. Uncharted deep space. Endless operation.";
+    showUpgradeToast("UNCHARTED SPACE", "MISSION 02 · ENDLESS");
+    playTone("launch");
+  }
+
+  function restartMission() {
+    if (mission === 2) startMissionTwo(false);
+    else startMissionOne();
+  }
+
+  function completeMissionOne() {
+    if (mission !== 1 || state !== "running") return;
+    state = "missioncomplete";
+    ui.missionComplete.classList.add("visible");
+    ui.missionObjective.textContent = "SOLAR SYSTEM ESCAPED";
+    ui.missionProgress.style.width = "100%";
+    ui.announcer.textContent = "Mission one complete. Heliopause crossed.";
+    updateMusicState();
+    playTone("complete");
+  }
+
   function togglePause(forceResume = false) {
-    if (state === "idle" || state === "gameover" || state === "config" || state === "options") return;
+    if (state === "idle" || state === "gameover" || state === "missioncomplete" || state === "config" || state === "options") return;
     if (state === "paused" || forceResume) {
       state = "running";
       ui.pause.classList.remove("visible");
@@ -397,6 +526,24 @@
     ui.sound.classList.toggle("muted", !soundEnabled);
     ui.sound.textContent = soundEnabled ? "SFX" : "OFF";
     ui.sound.setAttribute("aria-label", soundEnabled ? "Mute sound effects" : "Enable sound effects");
+    const musicPercent = Math.round(settings.musicVolume * 100);
+    const sfxPercent = Math.round(settings.sfxVolume * 100);
+    ui.musicVolume.value = String(musicPercent);
+    ui.musicVolumeValue.textContent = `${musicPercent}%`;
+    ui.sfxVolume.value = String(sfxPercent);
+    ui.sfxVolumeValue.textContent = `${sfxPercent}%`;
+  }
+
+  function setVolumeSetting(key, value) {
+    if (!(key in settings)) return;
+    settings[key] = clamp(Number(value), 0, 1);
+    localStorage.setItem("starfall-settings-v1", JSON.stringify(settings));
+    updateSettingsUi();
+    if (key === "musicVolume" && audioContext && musicBus && state === "running") {
+      const now = audioContext.currentTime;
+      musicBus.gain.cancelScheduledValues(now);
+      musicBus.gain.linearRampToValueAtTime(Math.max(0.0001, settings.musicVolume), now + 0.08);
+    }
   }
 
   function setFeatureSetting(key, enabled) {
@@ -444,6 +591,7 @@
     ui.settingsPopover.hidden = true;
     ui.settingsButton.classList.remove("active");
     ui.settingsButton.setAttribute("aria-expanded", "false");
+    ui.missionComplete.classList.remove("visible");
     if (score > highScore) {
       highScore = score;
       localStorage.setItem("starfall-high-score", String(highScore));
@@ -1004,6 +1152,49 @@
     showUpgradeToast(type.name.toUpperCase(), "PLANETARY BODY DETECTED");
   }
 
+  function spawnSolarPlanet(event) {
+    const scale = clamp(width / 1100, 0.68, 1);
+    const radius = event.radius * scale;
+    const type = solarBodyTypes[event.id];
+    solarPlanets.push({
+      type,
+      x: clamp(width * event.side, radius + 12, width - radius - 12),
+      y: -radius - 45,
+      radius,
+      vy: event.speed,
+      rotation: random(-0.35, 0.35),
+      rotationSpeed: event.id === "jupiter" || event.id === "saturn" ? 0.032 : 0.018,
+      phase: random(0, TAU),
+      rings: Boolean(event.rings),
+      collision: true,
+      label: `${type.name.toUpperCase()} · SOLAR SYSTEM`,
+    });
+    showUpgradeToast(`${type.name.toUpperCase()} APPROACH`, "MISSION 01 · NAVIGATION");
+  }
+
+  function updateSolarMission(dt) {
+    missionElapsed += dt;
+    while (solarEventIndex < solarMissionEvents.length && missionElapsed >= solarMissionEvents[solarEventIndex].at) {
+      spawnSolarPlanet(solarMissionEvents[solarEventIndex]);
+      solarEventIndex += 1;
+    }
+    if (!beltAnnounced && missionElapsed >= 18) {
+      beltAnnounced = true;
+      showUpgradeToast("DENSE ASTEROID BELT", "MISSION 01 · SURVIVE");
+      ui.announcer.textContent = "Asteroid belt entered. Dodge or destroy incoming rocks.";
+    }
+    if (settings.asteroids && missionElapsed >= 18 && missionElapsed < 43) {
+      const beltDelay = missionElapsed < 23 ? 0.86 : missionElapsed > 38 ? 0.92 : 0.68;
+      spawnClock += dt;
+      if (spawnClock >= beltDelay) {
+        spawnClock -= beltDelay;
+        spawnAsteroid();
+        if (missionElapsed > 27 && missionElapsed < 36 && Math.random() < 0.14) spawnAsteroid();
+      }
+    }
+    if (missionElapsed >= SOLAR_MISSION_DURATION) completeMissionOne();
+  }
+
   function rollHostileDefense(baseHp) {
     const roll = Math.random();
     if (roll < 0.34) return { defense: "none", armor: 0, hpBonus: 0, shield: 0 };
@@ -1184,39 +1375,43 @@
     if (state !== "running") return;
 
     elapsed += dt;
+    if (mission === 1) {
+      updateSolarMission(dt);
+      if (state !== "running") return;
+    }
     timeSinceDamage += dt;
     ship.invulnerable = Math.max(0, ship.invulnerable - dt);
     if (upgrades.regeneration > 0 && timeSinceDamage > 3.5 && health < maxHealth) {
       health = Math.min(maxHealth, health + (0.5 + upgrades.regeneration * 0.65) * dt);
     }
-    if (settings.shootingStars) shootingStarClock += dt;
-    if (settings.shootingStars && shootingStarClock >= nextShootingStar) {
+    if (mission === 2 && settings.shootingStars) shootingStarClock += dt;
+    if (mission === 2 && settings.shootingStars && shootingStarClock >= nextShootingStar) {
       shootingStarClock = 0;
       nextShootingStar = random(7, 13);
       spawnShootingStar();
     }
-    if (settings.planets) planetClock += dt;
-    if (settings.planets && planetClock >= nextPlanet) {
+    if (mission === 2 && settings.planets) planetClock += dt;
+    if (mission === 2 && settings.planets && planetClock >= nextPlanet) {
       planetClock = 0;
       nextPlanet = random(27, 44);
       spawnPlanet();
     }
-    if (settings.alienShips) alienClock += dt;
-    if (settings.alienShips && alienClock >= nextAlien) {
+    if (mission === 2 && settings.alienShips) alienClock += dt;
+    if (mission === 2 && settings.alienShips && alienClock >= nextAlien) {
       alienClock = 0;
       nextAlien = random(Math.max(7.5, 12.5 - getWave() * 0.35), Math.max(12, 19 - getWave() * 0.3));
       spawnAlienShip();
     }
-    if (settings.spaceStations) stationClock += dt;
-    if (settings.spaceStations && stationClock >= nextStation) {
+    if (mission === 2 && settings.spaceStations) stationClock += dt;
+    if (mission === 2 && settings.spaceStations && stationClock >= nextStation) {
       stationClock = 0;
       nextStation = random(38, 62);
       spawnSpaceStation();
     }
     const wave = getWave();
     const spawnDelay = Math.max(0.48, 1.25 - (wave - 1) * 0.05);
-    if (settings.asteroids) spawnClock += dt;
-    if (settings.asteroids && spawnClock >= spawnDelay) {
+    if (mission === 2 && settings.asteroids) spawnClock += dt;
+    if (mission === 2 && settings.asteroids && spawnClock >= spawnDelay) {
       spawnClock -= spawnDelay;
       spawnAsteroid();
       if (wave >= 4 && Math.random() < 0.08) spawnAsteroid();
@@ -1384,6 +1579,22 @@
       if (planet.y - planet.radius > height + 40) planets.splice(planets.indexOf(planet), 1);
     }
 
+    for (const planet of [...solarPlanets]) {
+      planet.y += planet.vy * dt;
+      planet.rotation += planet.rotationSpeed * dt;
+      planet.phase += dt;
+      if (planet.collision) {
+        const collisionRadius = planet.radius * 0.82 + ship.radius;
+        if (distanceSq(planet, ship) <= collisionRadius * collisionRadius) {
+          createExplosion(ship.x, ship.y, 62, 2.6);
+          screenShake = 18;
+          endGame(`PLANETARY IMPACT · ${planet.type.name.toUpperCase()}`);
+          return;
+        }
+      }
+      if (planet.y - planet.radius > height + 120) solarPlanets.splice(solarPlanets.indexOf(planet), 1);
+    }
+
     for (const enemy of [...alienShips]) {
       updateHostile(enemy, dt);
       if (enemy.y - enemy.radius > height + 70) alienShips.splice(alienShips.indexOf(enemy), 1);
@@ -1513,10 +1724,40 @@
     }
   }
 
+  function updateMissionHud() {
+    if (mission === 1) {
+      ui.missionNumber.textContent = "MISSION 01 · SOLAR ESCAPE";
+      const objective = missionElapsed < 7
+        ? "CLEAR EARTH ORBIT"
+        : missionElapsed < 18
+          ? "PASS THE ORBIT OF MARS"
+          : missionElapsed < 43
+            ? "SURVIVE THE ASTEROID BELT"
+            : missionElapsed < 61
+              ? "NAVIGATE JUPITER AND SATURN"
+              : missionElapsed < 78
+                ? "CROSS THE OUTER PLANETS"
+                : "REACH THE HELIOPAUSE";
+      ui.missionObjective.textContent = objective;
+      ui.missionProgress.style.width = `${clamp(missionElapsed / SOLAR_MISSION_DURATION, 0, 1) * 100}%`;
+    } else {
+      ui.missionNumber.textContent = "MISSION 02 · ENDLESS";
+      ui.missionObjective.textContent = `UNCHARTED DEEP SPACE · WAVE ${String(getWave()).padStart(2, "0")}`;
+      ui.missionProgress.style.width = "100%";
+    }
+  }
+
   function updateHud(forceRadar = false) {
     ui.score.textContent = padScore(score);
     ui.highScore.textContent = padScore(Math.max(highScore, score));
-    ui.wave.textContent = String(getWave()).padStart(2, "0");
+    if (mission === 1) {
+      const leg = missionElapsed < 18 ? 1 : missionElapsed < 43 ? 2 : missionElapsed < 61 ? 3 : missionElapsed < 78 ? 4 : 5;
+      ui.waveLabel.textContent = "LEG";
+      ui.wave.textContent = String(leg).padStart(2, "0");
+    } else {
+      ui.waveLabel.textContent = "WAVE";
+      ui.wave.textContent = String(getWave()).padStart(2, "0");
+    }
     const healthRatio = health / maxHealth;
     ui.health.textContent = maxHealth > 100 ? `${Math.round(health)} / ${maxHealth}` : `${Math.round(healthRatio * 100)}%`;
     ui.healthBar.style.width = `${healthRatio * 100}%`;
@@ -1525,8 +1766,9 @@
     ui.healthBar.style.background = healthColor;
     ui.shield.textContent = shieldMax > 0 ? `${Math.round(shield)} / ${shieldMax}` : "OFFLINE";
     ui.shieldBar.style.width = `${shieldMax > 0 ? (shield / shieldMax) * 100 : 0}%`;
-    const contacts = asteroids.length + shootingStars.length + planets.length + alienShips.length + spaceStations.length;
+    const contacts = asteroids.length + shootingStars.length + planets.length + solarPlanets.length + alienShips.length + spaceStations.length;
     ui.threats.textContent = `${contacts} ${contacts === 1 ? "CONTACT" : "CONTACTS"}`;
+    updateMissionHud();
     if (forceRadar) updateRadar();
   }
 
@@ -1553,6 +1795,13 @@
       dot.style.top = `${clamp((planet.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
     }
+    for (const planet of solarPlanets) {
+      const dot = document.createElement("i");
+      dot.className = "radar-dot planet-dot solar-dot";
+      dot.style.left = `${clamp((planet.x / width) * 60 + 4, 3, 64)}px`;
+      dot.style.top = `${clamp((planet.y / height) * 54 + 4, 3, 57)}px`;
+      ui.radar.appendChild(dot);
+    }
     for (const hostile of [...alienShips, ...spaceStations]) {
       const dot = document.createElement("i");
       dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : ""}`;
@@ -1573,11 +1822,13 @@
     ctx.fillRect(0, 0, width, height);
     drawNebula();
     drawStars();
+    if (mission === 1) drawSolarBackdrop();
 
     const shakeX = settings.screenShake && screenShake ? random(-screenShake, screenShake) : 0;
     const shakeY = settings.screenShake && screenShake ? random(-screenShake, screenShake) : 0;
     ctx.translate(shakeX, shakeY);
     drawGuideLines();
+    for (const planet of solarPlanets) drawSolarPlanet(planet);
     for (const planet of planets) drawPlanet(planet);
     for (const star of shootingStars) drawShootingStar(star);
     for (const asteroid of asteroids) drawAsteroid(asteroid);
@@ -1600,6 +1851,20 @@
     haze.addColorStop(0.5, "rgba(20, 84, 128, 0.09)");
     haze.addColorStop(1, "rgba(70, 16, 91, 0.03)");
     ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  }
+
+  function drawSolarBackdrop() {
+    const departure = clamp(1 - missionElapsed / 22, 0, 1);
+    if (departure <= 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const glow = ctx.createRadialGradient(width * 0.5, height * 1.08, 0, width * 0.5, height * 1.08, height * 0.72);
+    glow.addColorStop(0, `rgba(255, 224, 160, ${0.2 * departure})`);
+    glow.addColorStop(0.34, `rgba(82, 169, 255, ${0.11 * departure})`);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
   }
@@ -1632,6 +1897,183 @@
       ctx.lineTo(x, height);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  function drawSolarPlanet(planet) {
+    const { type, radius: r } = planet;
+    ctx.save();
+    ctx.translate(planet.x, planet.y);
+
+    if (type.id === "earth") {
+      const moonAngle = planet.phase * 0.16 - 0.8;
+      const moonX = Math.cos(moonAngle) * r * 1.28;
+      const moonY = Math.sin(moonAngle) * r * 0.34 - r * 0.14;
+      const moon = ctx.createRadialGradient(moonX - r * 0.045, moonY - r * 0.045, 0, moonX, moonY, r * 0.085);
+      moon.addColorStop(0, "#f0f1e9");
+      moon.addColorStop(0.58, "#8f969e");
+      moon.addColorStop(1, "#242b35");
+      ctx.fillStyle = moon;
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, r * 0.085, 0, TAU);
+      ctx.fill();
+    }
+
+    const ringTilt = type.id === "uranus" ? 1.18 : -0.2;
+    if (planet.rings) {
+      ctx.save();
+      ctx.rotate(ringTilt);
+      ctx.strokeStyle = type.id === "saturn" ? "rgba(231, 204, 145, 0.46)" : "rgba(173, 235, 241, 0.32)";
+      ctx.lineWidth = Math.max(5, r * 0.1);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.72, r * 0.38, 0, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(84, 71, 63, 0.28)";
+      ctx.lineWidth = Math.max(2, r * 0.025);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.46, r * 0.3, 0, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.rotate(planet.rotation);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.clip();
+    const surface = ctx.createRadialGradient(-r * 0.34, -r * 0.38, r * 0.04, r * 0.08, r * 0.06, r * 1.18);
+    surface.addColorStop(0, type.colors[1]);
+    surface.addColorStop(0.58, type.colors[0]);
+    surface.addColorStop(1, "#030713");
+    ctx.fillStyle = surface;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+
+    if (type.id === "earth") {
+      ctx.fillStyle = "#3aa362";
+      const continents = [
+        [-0.35, -0.34, 0.34, 0.24, -0.25],
+        [0.3, -0.08, 0.26, 0.38, 0.38],
+        [-0.08, 0.42, 0.2, 0.18, 0.12],
+        [0.58, 0.35, 0.14, 0.1, -0.2],
+      ];
+      for (const [x, y, rx, ry, rotation] of continents) {
+        ctx.beginPath();
+        ctx.ellipse(x * r, y * r, rx * r, ry * r, rotation, 0, TAU);
+        ctx.fill();
+      }
+      ctx.fillStyle = "rgba(238, 252, 255, 0.92)";
+      ctx.fillRect(-r, -r, r * 2, r * 0.08);
+      ctx.fillRect(-r, r * 0.91, r * 2, r * 0.09);
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = Math.max(2, r * 0.025);
+      for (let i = -2; i <= 2; i += 1) {
+        ctx.beginPath();
+        ctx.arc(-r * 0.05, i * r * 0.28, r * 0.62, 0.2, 2.72);
+        ctx.stroke();
+      }
+    } else if (type.id === "mars") {
+      const craters = [[-0.42, -0.28, 0.13], [0.3, -0.44, 0.09], [0.46, 0.18, 0.15], [-0.12, 0.38, 0.11], [-0.55, 0.4, 0.07]];
+      for (const [x, y, size] of craters) {
+        ctx.fillStyle = "rgba(75, 27, 23, 0.45)";
+        ctx.strokeStyle = "rgba(241, 150, 103, 0.28)";
+        ctx.lineWidth = Math.max(1, r * 0.012);
+        ctx.beginPath();
+        ctx.ellipse(x * r, y * r, size * r, size * r * 0.66, 0.3, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(245, 231, 211, 0.72)";
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.91, r * 0.34, r * 0.1, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(88, 31, 26, 0.55)";
+      ctx.lineWidth = Math.max(2, r * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.75, r * 0.08);
+      ctx.bezierCurveTo(-r * 0.2, r * 0.26, r * 0.24, -r * 0.06, r * 0.78, r * 0.16);
+      ctx.stroke();
+    } else if (type.id === "jupiter" || type.id === "saturn") {
+      for (let i = -7; i <= 7; i += 1) {
+        const y = i * r * 0.13;
+        ctx.globalAlpha = 0.28 + (i % 2 === 0 ? 0.18 : 0);
+        ctx.strokeStyle = i % 3 === 0 ? type.colors[2] : i % 2 === 0 ? type.colors[1] : "#fff1d2";
+        ctx.lineWidth = r * (type.id === "jupiter" && i % 3 === 0 ? 0.09 : 0.052);
+        ctx.beginPath();
+        ctx.moveTo(-r * 1.05, y);
+        ctx.bezierCurveTo(-r * 0.35, y + r * 0.06, r * 0.38, y - r * 0.05, r * 1.05, y);
+        ctx.stroke();
+      }
+      if (type.id === "jupiter") {
+        ctx.globalAlpha = 0.66;
+        ctx.fillStyle = "#a74637";
+        ctx.beginPath();
+        ctx.ellipse(r * 0.34, r * 0.23, r * 0.2, r * 0.09, -0.08, 0, TAU);
+        ctx.fill();
+      }
+    } else if (type.id === "uranus") {
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = "#e5ffff";
+      ctx.lineWidth = r * 0.045;
+      for (let i = -4; i <= 4; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(-r, i * r * 0.2);
+        ctx.lineTo(r, i * r * 0.2 + r * 0.05);
+        ctx.stroke();
+      }
+    } else if (type.id === "neptune") {
+      ctx.globalAlpha = 0.34;
+      ctx.strokeStyle = "#7db9ff";
+      ctx.lineWidth = r * 0.055;
+      for (let i = -4; i <= 4; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(-r, i * r * 0.19);
+        ctx.bezierCurveTo(-r * 0.3, i * r * 0.19 + r * 0.05, r * 0.4, i * r * 0.19 - r * 0.04, r, i * r * 0.19);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(20, 34, 104, 0.78)";
+      ctx.beginPath();
+      ctx.ellipse(r * 0.3, r * 0.2, r * 0.17, r * 0.08, -0.12, 0, TAU);
+      ctx.fill();
+    }
+
+    const limb = ctx.createRadialGradient(-r * 0.35, -r * 0.38, r * 0.1, r * 0.34, r * 0.32, r * 1.2);
+    limb.addColorStop(0, "rgba(255,255,255,0.15)");
+    limb.addColorStop(0.58, "rgba(0,0,0,0.02)");
+    limb.addColorStop(1, "rgba(0,0,0,0.86)");
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = limb;
+    ctx.fillRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+
+    ctx.strokeStyle = type.atmosphere;
+    ctx.lineWidth = Math.max(2, r * 0.022);
+    ctx.globalAlpha = 0.72;
+    ctx.shadowBlur = Math.min(24, r * 0.16);
+    ctx.shadowColor = type.atmosphere;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 1, 0, TAU);
+    ctx.stroke();
+
+    if (planet.rings) {
+      ctx.save();
+      ctx.rotate(ringTilt - planet.rotation);
+      ctx.globalAlpha = 0.72;
+      ctx.strokeStyle = type.id === "saturn" ? "#e6ca8f" : "#b6edf2";
+      ctx.lineWidth = Math.max(4, r * 0.06);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.72, r * 0.38, 0, 0.03, Math.PI - 0.03);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.rotate(-planet.rotation);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "#dffaff";
+    ctx.font = "800 8px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(planet.label, 0, -r - 14);
     ctx.restore();
   }
 
@@ -2673,7 +3115,7 @@
       oscillator.frequency.setValueAtTime(frequency, now);
       oscillator.detune.setValueAtTime(index === 2 ? 5 : index === 1 ? -4 : 0, now);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.linearRampToValueAtTime(index === 0 ? 0.028 : 0.013, now + 0.45);
+      gain.gain.linearRampToValueAtTime(index === 0 ? 0.055 : 0.026, now + 0.45);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.15);
       oscillator.connect(gain).connect(musicBus);
       oscillator.start(now);
@@ -2684,7 +3126,7 @@
     signal.type = "sine";
     signal.frequency.setValueAtTime(chord[1] * 4, now + 1.05);
     signalGain.gain.setValueAtTime(0.0001, now);
-    signalGain.gain.linearRampToValueAtTime(0.009, now + 1.12);
+    signalGain.gain.linearRampToValueAtTime(0.018, now + 1.12);
     signalGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.72);
     signal.connect(signalGain).connect(musicBus);
     signal.start(now + 1.05);
@@ -2713,7 +3155,7 @@
     const now = audioContext.currentTime;
     musicBus.gain.cancelScheduledValues(now);
     musicBus.gain.setValueAtTime(Math.max(0.0001, musicBus.gain.value), now);
-    musicBus.gain.linearRampToValueAtTime(1, now + 0.35);
+    musicBus.gain.linearRampToValueAtTime(Math.max(0.0001, settings.musicVolume), now + 0.35);
     playMissionMusicChord();
     musicInterval = window.setInterval(playMissionMusicChord, 2600);
   }
@@ -2723,7 +3165,7 @@
     const now = audioContext.currentTime;
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
-    const settings = {
+    const toneSettings = {
       laser: [760, 240, 0.075, "sawtooth", 0.025],
       missile: [150, 70, 0.18, "square", 0.035],
       plasma: [420, 105, 0.22, "sine", 0.045],
@@ -2736,13 +3178,15 @@
       resource: [510, 740, 0.11, "sine", 0.022],
       switch: [330, 520, 0.06, "sine", 0.018],
       enemy: [210, 118, 0.14, "sawtooth", 0.022],
+      launch: [110, 720, 0.55, "sawtooth", 0.045],
+      complete: [392, 1175, 0.7, "triangle", 0.04],
     }[type];
-    if (!settings) return;
-    const [start, end, duration, shape, volume] = settings;
+    if (!toneSettings) return;
+    const [start, end, duration, shape, volume] = toneSettings;
     oscillator.type = shape;
     oscillator.frequency.setValueAtTime(start, now);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, end), now + duration);
-    gain.gain.setValueAtTime(volume, now);
+    gain.gain.setValueAtTime(Math.max(0.0001, volume * settings.sfxVolume * 2.1), now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     oscillator.connect(gain).connect(audioContext.destination);
     oscillator.start(now);
@@ -2788,17 +3232,21 @@
       return;
     }
     if (event.code === "Space" && state === "idle") {
-      startGame();
+      startMissionOne();
+      return;
+    }
+    if (event.code === "Space" && state === "missioncomplete") {
+      startMissionTwo(true);
       return;
     }
     if (event.code === "Space" && state === "gameover") {
-      startGame();
+      restartMission();
       return;
     }
     if (event.code === "Escape") {
       if (!ui.configPopover.hidden) setConfigOpen(false);
       else if (!ui.settingsPopover.hidden) setSettingsOpen(false);
-      else if (state === "paused") togglePause(true);
+      else if (state !== "gameover") setSettingsOpen(true);
       return;
     }
     keys.add(event.code);
@@ -2806,8 +3254,9 @@
 
   window.addEventListener("keyup", (event) => keys.delete(event.code));
 
-  document.getElementById("startButton").addEventListener("click", startGame);
-  document.getElementById("restartButton").addEventListener("click", startGame);
+  document.getElementById("startButton").addEventListener("click", startMissionOne);
+  document.getElementById("restartButton").addEventListener("click", restartMission);
+  document.getElementById("missionTwoButton").addEventListener("click", () => startMissionTwo(true));
   document.getElementById("resumeButton").addEventListener("click", () => togglePause(true));
   document.getElementById("pauseButton").addEventListener("click", () => togglePause());
   document.querySelectorAll(".weapon-slot").forEach((card) => {
@@ -2819,6 +3268,9 @@
   document.querySelectorAll("[data-setting]").forEach((button) => {
     button.addEventListener("click", () => setFeatureSetting(button.dataset.setting, !settings[button.dataset.setting]));
   });
+  document.querySelectorAll("[data-volume]").forEach((input) => {
+    input.addEventListener("input", () => setVolumeSetting(input.dataset.volume, Number(input.value) / 100));
+  });
   ui.configButton.addEventListener("click", () => setConfigOpen(ui.configPopover.hidden));
   document.getElementById("closeConfigButton").addEventListener("click", () => setConfigOpen(false));
   ui.settingsButton.addEventListener("click", () => setSettingsOpen(ui.settingsPopover.hidden));
@@ -2827,6 +3279,13 @@
     unlockAudio();
     setFeatureSetting("soundFx", !settings.soundFx);
     if (settings.soundFx) playTone("switch");
+  });
+  document.getElementById("testAudioButton").addEventListener("click", () => {
+    unlockAudio();
+    if (!settings.soundFx) setFeatureSetting("soundFx", true);
+    if (settings.sfxVolume < 0.05) setVolumeSetting("sfxVolume", 0.8);
+    playTone("upgrade");
+    ui.announcer.textContent = "Audio test played.";
   });
 
   const movePad = document.getElementById("movePad");
