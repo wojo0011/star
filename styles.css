@@ -864,6 +864,16 @@ body.cinematic-active .upgrade-toast {
   margin-top: 9px;
 }
 
+.upgrade-market-note {
+  margin: 9px 0 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(242, 212, 122, 0.2);
+  background: linear-gradient(90deg, rgba(242, 212, 122, 0.08), rgba(86, 244, 255, 0.035));
+  color: #e8d99b;
+  font: 800 0.5rem/1.45 ui-monospace, monospace;
+  letter-spacing: 0.07em;
+}
+
 .upgrade-group-title {
   display: flex;
   grid-column: 1 / -1;
@@ -890,9 +900,15 @@ body.cinematic-active .upgrade-toast {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   min-height: 100px;
+  padding: 0;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--upgrade-color) 35%, transparent);
   background: linear-gradient(135deg, color-mix(in srgb, var(--upgrade-color) 9%, rgba(5, 11, 23, 0.92)), rgba(5, 11, 23, 0.94));
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  appearance: none;
   transition: border-color 160ms ease, transform 160ms ease, opacity 160ms ease;
 }
 
@@ -907,9 +923,10 @@ body.cinematic-active .upgrade-toast {
   border-radius: 50%;
 }
 
-.upgrade-card.locked {
-  opacity: 0.48;
-  filter: saturate(0.55);
+.upgrade-card:not(.affordable):not(.maxed) {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: saturate(0.62);
 }
 
 .upgrade-card.installed {
@@ -921,8 +938,24 @@ body.cinematic-active .upgrade-toast {
   animation: upgrade-card-pulse 1.8s ease-in-out infinite;
 }
 
-.upgrade-card:hover {
+.upgrade-card.affordable {
+  border-color: color-mix(in srgb, var(--upgrade-color) 72%, transparent);
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--upgrade-color) 8%, transparent), 0 0 12px color-mix(in srgb, var(--upgrade-color) 10%, transparent);
+}
+
+.upgrade-card.maxed {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.upgrade-card.service .upgrade-picture {
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--upgrade-color) 22%, transparent), transparent 67%);
+}
+
+.upgrade-card:not(:disabled):hover,
+.upgrade-card:not(:disabled):focus-visible {
   z-index: 1;
+  outline: none;
   border-color: var(--upgrade-color);
   transform: translateY(-2px);
   opacity: 1;
@@ -1044,6 +1077,39 @@ body.cinematic-active .upgrade-toast {
   box-shadow: 0 0 7px var(--upgrade-color);
 }
 
+.upgrade-purchase {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 8px -8px -8px;
+  padding: 6px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--upgrade-color) 22%, transparent);
+  background: color-mix(in srgb, var(--upgrade-color) 7%, transparent);
+}
+
+.upgrade-purchase span {
+  color: #f7df83;
+  font: 900 0.46rem ui-monospace, monospace;
+  letter-spacing: 0.04em;
+}
+
+.upgrade-purchase em {
+  color: rgba(220, 238, 245, 0.58);
+  font: 800 0.36rem ui-monospace, monospace;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.upgrade-card.affordable .upgrade-purchase {
+  background: color-mix(in srgb, var(--upgrade-color) 14%, rgba(8, 16, 29, 0.88));
+}
+
+.upgrade-card.affordable .upgrade-purchase em {
+  color: var(--upgrade-color);
+}
+
 @keyframes upgrade-schematic-spin {
   to { transform: rotate(360deg); }
 }
@@ -1080,8 +1146,7 @@ body.cinematic-active .upgrade-toast {
   background: rgba(255, 196, 54, 0.08);
 }
 
-.resource-hold,
-.fabricator {
+.resource-hold {
   margin-top: 12px;
   padding-top: 11px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -1139,53 +1204,16 @@ body.cinematic-active .upgrade-toast {
   border-color: rgba(255, 255, 255, 0.07);
 }
 
-.fabricator > .eyebrow {
-  margin-bottom: 7px;
-  color: #f2d47a;
-}
-
 .fabricator-note {
   margin: -1px 0 8px;
   color: rgba(213, 233, 241, 0.68);
   font: 600 0.52rem/1.45 ui-monospace, monospace;
 }
 
-.fabricator-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-
-.fabricator-grid button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 30px;
-  padding: 6px 7px;
-  border: 1px solid rgba(242, 212, 122, 0.22);
-  background: rgba(242, 212, 122, 0.055);
-  color: #e6e9ed;
-  cursor: pointer;
-  font-size: 0.49rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-}
-
-.fabricator-grid button:hover,
-.fabricator-grid button:focus-visible {
-  outline: none;
-  border-color: #f2d47a;
-  background: rgba(242, 212, 122, 0.14);
-}
-
-.fabricator-grid button:disabled {
-  cursor: not-allowed;
-  opacity: 0.34;
-}
-
-.fabricator-grid small {
-  color: #f2d47a;
-  font: 800 0.46rem ui-monospace, monospace;
+.resource-hold .fabricator-note {
+  margin: 9px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .upgrade-toast {
@@ -1936,10 +1964,6 @@ kbd {
     grid-template-columns: 1fr;
     justify-content: stretch;
     margin-top: 9px;
-  }
-
-  #configPopover .fabricator-grid {
-    grid-template-columns: 1fr 1fr;
   }
 
   .upgrade-card {
