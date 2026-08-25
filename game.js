@@ -199,12 +199,15 @@
   const LAUNCH_INTRO_DURATION = 8;
   const launchIntroCues = [
     { at: 0.12, type: "introPulse", strength: 1 },
-    { at: 0.72, type: "countdown", strength: 3 },
-    { at: 1.68, type: "countdown", strength: 2 },
-    { at: 2.64, type: "countdown", strength: 1 },
-    { at: 3.55, type: "launch", strength: 1 },
-    { at: 5.52, type: "separation", strength: 1 },
-    { at: 6.42, type: "reveal", strength: 1 },
+    { at: 0.48, type: "countdown", strength: 3 },
+    { at: 0.7, type: "vent", strength: 1 },
+    { at: 1.42, type: "countdown", strength: 2 },
+    { at: 1.58, type: "deluge", strength: 1 },
+    { at: 2.34, type: "countdown", strength: 1 },
+    { at: 2.62, type: "ignition", strength: 1 },
+    { at: 3.25, type: "launch", strength: 1 },
+    { at: 5.25, type: "separation", strength: 1 },
+    { at: 6.05, type: "reveal", strength: 1 },
   ];
   const alienShipTypes = [
     { id: "scout", name: "Alien scout", radius: 23, hp: 4, speed: 82, score: 420, color: "#ff5d9e" },
@@ -527,7 +530,7 @@
     solarPlanets.push({
       type: solarBodyTypes.earth,
       x: width / 2,
-      y: height + radius * 0.46,
+      y: height + radius * 0.72,
       radius,
       vy: 19,
       rotation: -0.18,
@@ -542,7 +545,6 @@
   function completeLaunchIntro() {
     if (state !== "intro") return;
     launchIntroElapsed = LAUNCH_INTRO_DURATION;
-    spawnEarthDeparture();
     prepareRunningState();
     ui.announcer.textContent = "Mission one launched from Earth. Leave the Solar System.";
     screenShake = 7;
@@ -554,6 +556,7 @@
     resetMissionMusic();
     mission = 1;
     resetGame();
+    spawnEarthDeparture();
     state = "intro";
     launchIntroElapsed = 0;
     launchIntroCueIndex = 0;
@@ -1224,11 +1227,21 @@
     toastTimer = window.setTimeout(() => ui.upgradeToast.classList.remove("visible"), 2200);
   }
 
+  const fabricationCosts = {
+    fireRate: 8, wideShot: 10, shield: 12, shieldOvercharge: 15, shieldRepair: 4,
+    engine: 10, maneuver: 9, armor: 14, armorRepair: 6, hullRepair: 7,
+    regeneration: 16, magnet: 11, ricochet: 13, cloak: 18, rapidFire: 6,
+    missile: 18, plasma: 22, railgun: 26,
+  };
+
   const upgradeCatalog = [
     { group: "01 · DEFENCE", type: "shield", name: "Shield Array", max: 4, color: "#63b8ff", description: "Absorbs damage before armour." },
     { group: "01 · DEFENCE", type: "shieldOvercharge", name: "Shield Overcharge", max: 4, color: "#9bdcff", description: "Raises capacity and recharge speed." },
     { group: "01 · DEFENCE", type: "armor", name: "Armour Plating", max: 4, color: "#d8e4ec", description: "Sacrificial layer ahead of the hull." },
     { group: "01 · DEFENCE", type: "regeneration", name: "Hull Regeneration", max: 4, color: "#52ff9b", description: "Repairs hull after combat quiets." },
+    { group: "01 · DEFENCE", type: "shieldRepair", name: "Shield Recharge", max: 1, color: "#78d9ff", description: "Immediately restores shield energy.", service: true },
+    { group: "01 · DEFENCE", type: "armorRepair", name: "Armour Repair", max: 1, color: "#d8e4ec", description: "Patches damaged armour plating.", service: true },
+    { group: "01 · DEFENCE", type: "hullRepair", name: "Hull Repair", max: 1, color: "#52ff9b", description: "Restores hull integrity immediately.", service: true },
     { group: "02 · WEAPONS", type: "fireRate", name: "Overdrive", max: 5, color: "#ff9f45", description: "Permanently reduces weapon delay." },
     { group: "02 · WEAPONS", type: "wideShot", name: "Wide Shot", max: 4, color: "#56f4ff", description: "Adds outboard cannons and lanes." },
     { group: "02 · WEAPONS", type: "ricochet", name: "Laser Ricochet", max: 3, color: "#71f7ff", description: "Bounces between unhit targets." },
@@ -1246,7 +1259,10 @@
     const drawings = {
       shield: '<circle cx="40" cy="32" r="19"/><path d="M22 37c5 13 18 19 18 19s13-6 18-19V19L40 12 22 19Z"/>',
       shieldOvercharge: '<circle cx="40" cy="34" r="23"/><circle cx="40" cy="34" r="16"/><path d="m44 13-12 22h9l-5 20 14-25h-9Z"/>',
+      shieldRepair: '<path d="M20 37c4 14 20 22 20 22s16-8 20-22V18L40 10 20 18Z"/><path d="M34 24h12v8h8v11h-8v8H34v-8h-8V32h8Z"/>',
       armor: '<path d="m18 20 22-9 22 9-4 29-18 10-18-10Z"/><path d="m25 25 15-6 15 6-3 18-12 7-12-7Z"/><path d="M40 19v31"/>',
+      armorRepair: '<path d="m17 22 23-10 23 10-5 31-18 9-18-9Z"/><path d="m27 42 9-9 7 7 11-13"/><path d="M24 49h32M40 16v12"/>',
+      hullRepair: '<path d="M18 18h44v39H18Z"/><path d="M33 24h14v9h9v13h-9v9H33v-9h-9V33h9Z"/><path d="m16 12 8 6M64 12l-8 6"/>',
       regeneration: '<path d="M20 19h40v34H20Z"/><path d="M34 25h12v9h9v12h-9v9H34v-9h-9V34h9Z"/><path d="M16 30c-6 10-2 23 8 29M64 42c5-11 0-23-11-28"/>',
       fireRate: '<path d="M17 18h29L35 31h23L29 56l8-18H17Z"/><path d="M55 17h9M58 27h9M53 37h12"/>',
       wideShot: '<circle cx="40" cy="51" r="6"/><path d="M40 44V12M35 44 22 16M45 44l13-28M31 47 13-23M49 47l13-23"/>',
@@ -1271,31 +1287,40 @@
         currentGroup = item.group;
         cards.push(`<h3 class="upgrade-group-title"><span>${currentGroup}</span><i></i></h3>`);
       }
-      const timedLevel = item.type === "rapidFire" ? Math.ceil((rapidFireTimer / 30) * item.max) : upgrades[item.type] || 0;
+      const subsystemMissing = item.type === "shieldRepair" ? shieldMax <= 0 : item.type === "armorRepair" ? armorMax <= 0 : false;
+      const itemAtMax = fabricationAtMax(item.type);
+      const timedLevel = item.service
+        ? itemAtMax && !subsystemMissing ? 1 : 0
+        : item.type === "rapidFire" ? Math.ceil((rapidFireTimer / 30) * item.max) : upgrades[item.type] || 0;
       const level = clamp(timedLevel, 0, item.max);
       const active = item.type === "cloak" ? cloakTimer > 0 : item.type === "rapidFire" ? rapidFireTimer > 0 : false;
-      const installed = level > 0;
+      const installed = item.service
+        ? item.type === "shieldRepair" ? shieldMax > 0 : item.type === "armorRepair" ? armorMax > 0 : true
+        : level > 0;
       let status = installed ? `MK ${level} / ${item.max}` : "NOT INSTALLED";
       if (item.type === "shield" && installed) status = `${Math.round(shield)} / ${shieldMax} SHIELD`;
       if (item.type === "armor" && installed) status = `${Math.round(armor)} / ${armorMax} ARMOUR`;
       if (item.type === "ricochet" && installed) status = `${level} BOUNCE${level > 1 ? "S" : ""}`;
       if (item.type === "cloak" && active) status = `ACTIVE · ${Math.ceil(cloakTimer)}S`;
       if (item.type === "rapidFire") status = active ? `ACTIVE · ${Math.ceil(rapidFireTimer)}S` : "TEMPORARY PICKUP";
+      if (item.type === "shieldRepair") status = shieldMax <= 0 ? "SHIELD REQUIRED" : shield >= shieldMax ? "FULLY CHARGED" : `${Math.round(shield)} / ${shieldMax} SHIELD`;
+      if (item.type === "armorRepair") status = armorMax <= 0 ? "ARMOUR REQUIRED" : armor >= armorMax ? "FULLY REPAIRED" : `${Math.round(armor)} / ${armorMax} ARMOUR`;
+      if (item.type === "hullRepair") status = health >= maxHealth ? "HULL AT 100%" : `${Math.round(health)} / ${maxHealth} HULL`;
+      const cost = fabricationCosts[item.type];
+      const atMax = itemAtMax;
+      const affordable = matterBalance >= cost;
+      const purchaseLabel = atMax
+        ? subsystemMissing ? item.type === "shieldRepair" ? "INSTALL SHIELD ARRAY" : "INSTALL ARMOUR PLATING" : item.service ? "SYSTEM RESTORED" : "MAXIMUM LEVEL"
+        : affordable ? `FABRICATE · ${cost} MU` : `${cost} MU · NEED ${Math.max(1, Math.ceil(cost - matterBalance))}`;
       const pips = Array.from({ length: item.max }, (_, index) => `<i class="${index < level ? "filled" : ""}"></i>`).join("");
-      cards.push(`<article class="upgrade-card${installed ? " installed" : " locked"}${active ? " active" : ""}" style="--upgrade-color:${item.color}" aria-label="${item.name}: ${status}">
-        <div class="upgrade-picture">${upgradeIllustration(item.type)}<span>${installed ? "ONLINE" : "SCHEMATIC"}</span></div>
-        <div class="upgrade-card-copy"><small>${currentGroup.slice(5)}</small><strong>${item.name}</strong><p>${item.description}</p><div class="upgrade-level"><span>${status}</span><b>${pips}</b></div></div>
-      </article>`);
+      cards.push(`<button type="button" data-fabricate="${item.type}" class="upgrade-card${installed ? " installed" : ""}${item.service ? " service" : ""}${active ? " active" : ""}${affordable && !atMax ? " affordable" : ""}${atMax ? " maxed" : ""}" style="--upgrade-color:${item.color}" aria-label="${item.name}: ${status}. ${purchaseLabel}"${atMax || !affordable ? " disabled" : ""}>
+        <div class="upgrade-picture">${upgradeIllustration(item.type)}<span>${item.service ? "SERVICE" : installed ? "ONLINE" : "SCHEMATIC"}</span></div>
+        <div class="upgrade-card-copy"><small>${currentGroup.slice(5)}</small><strong>${item.name}</strong><p>${item.description}</p><div class="upgrade-level"><span>${status}</span><b>${pips}</b></div><div class="upgrade-purchase"><span>${purchaseLabel}</span><em>${subsystemMissing ? "PREREQUISITE" : atMax ? "COMPLETE" : affordable ? "SELECT TO BUILD" : `BALANCE ${Math.floor(matterBalance)} MU`}</em></div></div>
+      </button>`);
     }
     ui.upgradeList.innerHTML = cards.join("");
     updateFabricatorButtons();
   }
-
-  const fabricationCosts = {
-    fireRate: 8, wideShot: 10, shield: 12, shieldOvercharge: 15, shieldRepair: 4,
-    engine: 10, maneuver: 9, armor: 14, armorRepair: 6, hullRepair: 7,
-    regeneration: 16, magnet: 11, ricochet: 13, cloak: 18, rapidFire: 6,
-  };
 
   function updateResourceUi() {
     ui.matterValue.textContent = String(Math.floor(matterBalance));
@@ -1308,7 +1333,7 @@
         return `<span class="resource-chip" title="${resource.name}"><i style="--resource-color:${resource.color}"></i>${resource.symbol} ×${amount}</span>`;
       }).join("")
       : '<span class="empty-resources">NO ELEMENTS RECOVERED</span>';
-    updateFabricatorButtons();
+    updateUpgradeUi();
   }
 
   function fabricationAtMax(type) {
@@ -1316,7 +1341,7 @@
     if (type === "armorRepair") return armorMax <= 0 || armor >= armorMax;
     if (type === "hullRepair") return health >= maxHealth;
     if (type === "rapidFire") return rapidFireTimer >= 30;
-    const limits = { fireRate: 5, wideShot: 4, shield: 4, shieldOvercharge: 4, engine: 4, maneuver: 4, armor: 4, regeneration: 4, magnet: 4, ricochet: 3, cloak: 4 };
+    const limits = { fireRate: 5, wideShot: 4, shield: 4, shieldOvercharge: 4, engine: 4, maneuver: 4, armor: 4, regeneration: 4, magnet: 4, ricochet: 3, cloak: 4, missile: 3, plasma: 3, railgun: 3 };
     return upgrades[type] >= limits[type];
   }
 
@@ -1324,7 +1349,11 @@
     document.querySelectorAll("[data-fabricate]").forEach((button) => {
       const type = button.dataset.fabricate;
       const unavailable = fabricationAtMax(type);
-      button.disabled = matterBalance < fabricationCosts[type] || unavailable;
+      const affordable = matterBalance >= fabricationCosts[type];
+      button.disabled = !affordable || unavailable;
+      button.classList.toggle("affordable", affordable && !unavailable);
+      button.classList.toggle("maxed", unavailable);
+      button.setAttribute("aria-disabled", String(button.disabled));
       if (type === "shieldRepair" && shieldMax <= 0) button.title = "Install a shield array first";
       else if (type === "armorRepair" && armorMax <= 0) button.title = "Install armour plating first";
       else if (unavailable) button.title = type.endsWith("Repair") ? "System already fully restored" : "Maximum level reached";
@@ -2581,7 +2610,7 @@
     const centerX = width * 0.5;
     const centerY = height + radius * 0.34 + retreat * height * 0.48;
     ctx.save();
-    ctx.globalAlpha = 1 - spaceMix * 0.78;
+    ctx.globalAlpha *= 1 - spaceMix * 0.78;
     ctx.shadowBlur = 44;
     ctx.shadowColor = "rgba(82, 183, 255, 0.72)";
     const atmosphere = ctx.createRadialGradient(centerX - radius * 0.22, centerY - radius * 0.5, radius * 0.05, centerX, centerY, radius);
@@ -2624,13 +2653,16 @@
   function drawLaunchPad(baseX, baseY, scale, alpha) {
     if (alpha <= 0) return;
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha *= alpha;
     ctx.translate(baseX, baseY);
-    ctx.strokeStyle = "#64798a";
-    ctx.fillStyle = "#172635";
+    ctx.strokeStyle = "#708899";
+    ctx.fillStyle = "#132432";
     ctx.lineWidth = Math.max(1, 2 * scale);
-    ctx.fillRect(-145 * scale, 0, 290 * scale, 18 * scale);
-    ctx.strokeRect(-145 * scale, 0, 290 * scale, 18 * scale);
+    ctx.fillRect(-180 * scale, 0, 360 * scale, 20 * scale);
+    ctx.strokeRect(-180 * scale, 0, 360 * scale, 20 * scale);
+    ctx.fillStyle = "#09141e";
+    ctx.fillRect(-46 * scale, 0, 92 * scale, 25 * scale);
+    ctx.strokeRect(-46 * scale, 0, 92 * scale, 25 * scale);
     ctx.fillStyle = "#263947";
     ctx.fillRect(-114 * scale, -188 * scale, 24 * scale, 188 * scale);
     ctx.strokeRect(-114 * scale, -188 * scale, 24 * scale, 188 * scale);
@@ -2643,8 +2675,23 @@
       ctx.lineTo(-114 * scale, y - 31 * scale);
     }
     ctx.stroke();
-    ctx.fillStyle = "#405767";
-    ctx.fillRect(-90 * scale, -158 * scale, 75 * scale, 9 * scale);
+    ctx.fillStyle = "#304655";
+    ctx.fillRect(-90 * scale, -158 * scale, 82 * scale, 9 * scale);
+    ctx.fillRect(-90 * scale, -89 * scale, 69 * scale, 8 * scale);
+    ctx.fillRect(21 * scale, -48 * scale, 76 * scale, 10 * scale);
+    ctx.strokeRect(21 * scale, -48 * scale, 76 * scale, 10 * scale);
+    ctx.fillStyle = "#516675";
+    ctx.fillRect(-12 * scale, -162 * scale, 7 * scale, 17 * scale);
+    ctx.fillRect(-25 * scale, -93 * scale, 7 * scale, 16 * scale);
+    for (const side of [-1, 1]) {
+      ctx.fillStyle = "#223846";
+      ctx.fillRect(side * 132 * scale - 5 * scale, -68 * scale, 10 * scale, 68 * scale);
+      ctx.strokeRect(side * 132 * scale - 5 * scale, -68 * scale, 10 * scale, 68 * scale);
+      ctx.beginPath();
+      ctx.moveTo(side * 132 * scale, -62 * scale);
+      ctx.lineTo(side * 63 * scale, -33 * scale);
+      ctx.stroke();
+    }
     ctx.fillStyle = "#ff9c45";
     ctx.shadowBlur = 10;
     ctx.shadowColor = "#ff6b2c";
@@ -2656,52 +2703,119 @@
     ctx.restore();
   }
 
+  function drawPrelaunchVapour(time, rocketX, rocketY, scale) {
+    const strength = clamp((time - 0.42) / 0.45, 0, 1) * (1 - clamp((time - 3.35) / 0.5, 0, 1));
+    if (strength <= 0) return;
+    ctx.save();
+    const baseAlpha = ctx.globalAlpha;
+    for (let puff = 0; puff < 28; puff += 1) {
+      const seed = puff * 7.91;
+      const age = ((time * (0.16 + (puff % 4) * 0.013)) + puff / 28) % 1;
+      const side = puff % 2 ? -1 : 1;
+      const ventY = rocketY + (-48 + (puff % 5) * 25) * scale;
+      const x = rocketX + side * (20 + age * 96) * scale + Math.sin(seed) * 12 * scale;
+      const y = ventY + age * 35 * scale + Math.cos(seed * 0.71) * 8 * scale;
+      const radius = (5 + age * 20 + (puff % 3) * 2) * scale;
+      ctx.globalAlpha = baseAlpha * strength * (1 - age) * 0.42;
+      const vapor = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      vapor.addColorStop(0, "rgba(238, 251, 255, 0.92)");
+      vapor.addColorStop(0.55, "rgba(190, 217, 228, 0.54)");
+      vapor.addColorStop(1, "rgba(151, 182, 197, 0)");
+      ctx.fillStyle = vapor;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawWaterDeluge(time, rocketX, padY, scale) {
+    const start = clamp((time - 1.46) / 0.24, 0, 1);
+    const stop = 1 - clamp((time - 2.32) / 0.44, 0, 1);
+    const strength = start * stop;
+    if (strength <= 0) return;
+    ctx.save();
+    const baseAlpha = ctx.globalAlpha;
+    ctx.globalCompositeOperation = "lighter";
+    for (const side of [-1, 1]) {
+      const sourceX = rocketX + side * 132 * scale;
+      const sourceY = padY - 61 * scale;
+      const targetX = rocketX + side * 31 * scale;
+      const targetY = padY - 2 * scale;
+      for (let jet = 0; jet < 5; jet += 1) {
+        const wobble = Math.sin(time * 24 + jet * 1.7 + side) * 5 * scale;
+        ctx.globalAlpha = baseAlpha * strength * (0.28 + jet * 0.07);
+        ctx.strokeStyle = jet % 2 ? "#baf5ff" : "#58cfea";
+        ctx.lineWidth = (1.2 + jet * 0.34) * scale;
+        ctx.beginPath();
+        ctx.moveTo(sourceX, sourceY + jet * 2 * scale);
+        ctx.quadraticCurveTo(rocketX + side * 78 * scale + wobble, padY - 18 * scale, targetX + wobble, targetY);
+        ctx.stroke();
+      }
+    }
+    for (let spray = 0; spray < 30; spray += 1) {
+      const seed = spray * 8.13;
+      const age = ((time * 0.5 + spray / 30) % 1);
+      const x = rocketX + Math.sin(seed) * (28 + age * 128) * scale;
+      const y = padY - 3 * scale - age * (18 + (spray % 4) * 7) * scale;
+      const radius = (3 + age * 16) * scale;
+      ctx.globalAlpha = baseAlpha * strength * (1 - age) * 0.24;
+      ctx.fillStyle = "#c9f8ff";
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawCinematicPlume(x, y, scale, intensity, launchProgress) {
     if (intensity <= 0) return;
-    const plumeLength = (75 + launchProgress * 155) * scale * intensity;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const flame = ctx.createLinearGradient(x, y, x, y + plumeLength);
-    flame.addColorStop(0, "#ffffff");
-    flame.addColorStop(0.18, "#fff2a8");
-    flame.addColorStop(0.48, "#ff8b29");
-    flame.addColorStop(0.76, "rgba(255, 59, 25, 0.72)");
-    flame.addColorStop(1, "rgba(64, 151, 255, 0)");
-    ctx.fillStyle = flame;
-    ctx.shadowBlur = 30 * scale;
-    ctx.shadowColor = "#ff6b2c";
-    ctx.beginPath();
-    ctx.moveTo(x - 13 * scale, y);
-    ctx.quadraticCurveTo(x - 21 * scale, y + plumeLength * 0.48, x, y + plumeLength);
-    ctx.quadraticCurveTo(x + 21 * scale, y + plumeLength * 0.48, x + 13 * scale, y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(205, 241, 255, 0.9)";
-    ctx.beginPath();
-    ctx.moveTo(x - 5 * scale, y);
-    ctx.lineTo(x, y + plumeLength * 0.58);
-    ctx.lineTo(x + 5 * scale, y);
-    ctx.closePath();
-    ctx.fill();
+    for (const nozzle of [-12, 0, 12]) {
+      const plumeLength = (68 + launchProgress * 155 + Math.sin(launchIntroElapsed * 31 + nozzle) * 10) * scale * intensity;
+      const flameX = x + nozzle * scale;
+      const flame = ctx.createLinearGradient(flameX, y, flameX, y + plumeLength);
+      flame.addColorStop(0, "#ffffff");
+      flame.addColorStop(0.16, "#e1f8ff");
+      flame.addColorStop(0.3, "#fff2a8");
+      flame.addColorStop(0.58, "#ff7b24");
+      flame.addColorStop(0.82, "rgba(255, 48, 18, 0.68)");
+      flame.addColorStop(1, "rgba(64, 151, 255, 0)");
+      ctx.fillStyle = flame;
+      ctx.shadowBlur = 30 * scale;
+      ctx.shadowColor = "#ff6b2c";
+      ctx.beginPath();
+      ctx.moveTo(flameX - 7 * scale, y);
+      ctx.quadraticCurveTo(flameX - 12 * scale, y + plumeLength * 0.46, flameX, y + plumeLength);
+      ctx.quadraticCurveTo(flameX + 12 * scale, y + plumeLength * 0.46, flameX + 7 * scale, y);
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   }
 
   function drawCinematicSmoke(time, rocketX, rocketBaseY, padY, scale, launchProgress) {
-    if (time < 3.34) return;
-    const ignition = clamp((time - 3.34) / 0.36, 0, 1);
+    if (time < 2.48) return;
+    const ignition = clamp((time - 2.48) / 0.42, 0, 1);
     ctx.save();
-    for (let puff = 0; puff < 34; puff += 1) {
+    const baseAlpha = ctx.globalAlpha;
+    for (let puff = 0; puff < 54; puff += 1) {
       const seed = puff * 9.73;
-      const age = ((time - 3.34) * (0.27 + (puff % 5) * 0.018) + puff / 34) % 1;
+      const age = ((time - 2.48) * (0.25 + (puff % 5) * 0.016) + puff / 54) % 1;
       const trailBias = puff % 3 === 0 && launchProgress > 0.18;
       const sourceY = trailBias ? rocketBaseY : padY;
       const spread = (28 + age * (trailBias ? 78 : 155)) * scale;
       const x = rocketX + Math.sin(seed) * spread;
-      const y = sourceY + age * (trailBias ? 170 : 54) * scale + Math.cos(seed * 0.63) * 11 * scale;
-      const radius = (8 + age * (trailBias ? 25 : 43) + (puff % 4) * 2) * scale;
-      const gray = 142 + (puff % 4) * 18;
-      ctx.globalAlpha = ignition * (1 - age) * (trailBias ? 0.34 : 0.52);
-      ctx.fillStyle = `rgb(${gray}, ${gray + 5}, ${gray + 10})`;
+      const y = sourceY + age * (trailBias ? 170 : -42) * scale + Math.cos(seed * 0.63) * 11 * scale;
+      const radius = (9 + age * (trailBias ? 28 : 51) + (puff % 4) * 2) * scale;
+      const gray = 126 + (puff % 5) * 19;
+      ctx.globalAlpha = baseAlpha * ignition * (1 - age) * (trailBias ? 0.38 : 0.58);
+      const cloud = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      cloud.addColorStop(0, `rgba(${gray + 35}, ${gray + 38}, ${gray + 42}, 0.94)`);
+      cloud.addColorStop(0.62, `rgba(${gray}, ${gray + 5}, ${gray + 10}, 0.72)`);
+      cloud.addColorStop(1, `rgba(${gray - 20}, ${gray - 15}, ${gray - 8}, 0)`);
+      ctx.fillStyle = cloud;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, TAU);
       ctx.fill();
@@ -2713,10 +2827,15 @@
     const direction = side < 0 ? -1 : 1;
     const alpha = 1 - clamp((separation - 0.68) / 0.32, 0, 1);
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha *= alpha;
     ctx.translate(x + direction * separation * 72 * scale, y + separation * 88 * scale);
     ctx.rotate(direction * separation * 0.52);
-    ctx.fillStyle = "#dce5e9";
+    const booster = ctx.createLinearGradient(direction * 14 * scale, 0, direction * 35 * scale, 0);
+    booster.addColorStop(0, "#667985");
+    booster.addColorStop(0.36, "#f5fafb");
+    booster.addColorStop(0.72, "#b7c7ce");
+    booster.addColorStop(1, "#536772");
+    ctx.fillStyle = booster;
     ctx.strokeStyle = "#718595";
     ctx.lineWidth = 1.5 * scale;
     ctx.beginPath();
@@ -2728,8 +2847,30 @@
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#ff6b2c";
-    ctx.fillRect(direction * 17 * scale, 22 * scale, direction * 15 * scale, 9 * scale);
+    ctx.strokeStyle = "rgba(30, 53, 67, 0.52)";
+    ctx.lineWidth = 0.8 * scale;
+    for (const panelY of [-26, 10, 45]) {
+      ctx.beginPath();
+      ctx.moveTo(direction * 18 * scale, panelY * scale);
+      ctx.lineTo(direction * 31 * scale, panelY * scale);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#142733";
+    ctx.fillRect(direction * 18 * scale, 22 * scale, direction * 14 * scale, 10 * scale);
+    ctx.fillStyle = "#ff7a32";
+    ctx.shadowBlur = 8 * scale;
+    ctx.shadowColor = "#ff5124";
+    ctx.fillRect(direction * 19 * scale, 25 * scale, direction * 12 * scale, 4 * scale);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#293b47";
+    ctx.beginPath();
+    ctx.moveTo(direction * 18 * scale, 72 * scale);
+    ctx.lineTo(direction * 34 * scale, 72 * scale);
+    ctx.lineTo(direction * 30 * scale, 84 * scale);
+    ctx.lineTo(direction * 21 * scale, 84 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -2738,7 +2879,7 @@
     drawRocketBooster(-1, x, y, scale, separation);
     drawRocketBooster(1, x, y, scale, separation);
     ctx.save();
-    ctx.globalAlpha = rocketAlpha;
+    ctx.globalAlpha *= rocketAlpha;
     ctx.translate(x, y);
     ctx.strokeStyle = "#728797";
     ctx.lineWidth = 1.5 * scale;
@@ -2756,8 +2897,32 @@
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#172b3a";
-    ctx.fillRect(-21 * scale, 24 * scale, 42 * scale, 17 * scale);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-18 * scale, -76 * scale);
+    ctx.lineTo(-22 * scale, 77 * scale);
+    ctx.lineTo(22 * scale, 77 * scale);
+    ctx.lineTo(18 * scale, -76 * scale);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = "rgba(8, 30, 44, 0.52)";
+    for (const panelY of [-51, -7, 40, 63]) ctx.fillRect(-24 * scale, panelY * scale, 48 * scale, 1.2 * scale);
+    ctx.fillRect(-1 * scale, -77 * scale, 2 * scale, 154 * scale);
+    for (let rivet = -63; rivet <= 62; rivet += 18) {
+      ctx.fillStyle = "rgba(21, 52, 68, 0.52)";
+      ctx.beginPath();
+      ctx.arc(-14 * scale, rivet * scale, 1.1 * scale, 0, TAU);
+      ctx.arc(14 * scale, rivet * scale, 1.1 * scale, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.fillStyle = "#132a3a";
+    ctx.fillRect(-21 * scale, 22 * scale, 42 * scale, 18 * scale);
+    ctx.fillStyle = "#e9f2f4";
+    ctx.font = `900 ${8 * scale}px ui-monospace, monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("STARFALL", 0, 31 * scale);
     ctx.fillStyle = "#57e8ff";
     ctx.shadowBlur = 12 * scale;
     ctx.shadowColor = "#56f4ff";
@@ -2774,6 +2939,22 @@
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    for (const nozzle of [-12, 0, 12]) {
+      const bell = ctx.createLinearGradient((nozzle - 5) * scale, 75 * scale, (nozzle + 5) * scale, 86 * scale);
+      bell.addColorStop(0, "#1a2830");
+      bell.addColorStop(0.5, "#80919a");
+      bell.addColorStop(1, "#111c22");
+      ctx.fillStyle = bell;
+      ctx.strokeStyle = "#9aacb5";
+      ctx.beginPath();
+      ctx.moveTo((nozzle - 4) * scale, 74 * scale);
+      ctx.lineTo((nozzle - 7) * scale, 86 * scale);
+      ctx.lineTo((nozzle + 7) * scale, 86 * scale);
+      ctx.lineTo((nozzle + 4) * scale, 74 * scale);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.restore();
 
     if (reveal <= 0) {
@@ -2793,11 +2974,16 @@
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+      ctx.strokeStyle = "rgba(30, 55, 68, 0.5)";
+      ctx.beginPath();
+      ctx.moveTo(-12 * scale, -104 * scale);
+      ctx.lineTo(12 * scale, -104 * scale);
+      ctx.stroke();
       ctx.restore();
     } else {
       for (const side of [-1, 1]) {
         ctx.save();
-        ctx.globalAlpha = 1 - reveal;
+        ctx.globalAlpha *= 1 - reveal;
         ctx.translate(x + side * reveal * 48 * scale, y - reveal * 18 * scale);
         ctx.rotate(side * reveal * 0.5);
         ctx.fillStyle = side < 0 ? "#a9b8c0" : "#e8f2f5";
@@ -2815,76 +3001,30 @@
     }
   }
 
-  function drawCinematicSpacecraft(x, y, scale, reveal) {
+  function drawCinematicSpacecraft(x, y, scale, reveal, handoff) {
     if (reveal <= 0) return;
-    const eased = introEase(reveal);
+    const emerged = introEase(reveal);
+    const deployedY = y - emerged * 62 * scale;
+    const deployedScale = scale * (0.45 + emerged * 0.55);
+    const renderX = x + (ship.x - x) * handoff;
+    const renderY = deployedY + (ship.y - deployedY) * handoff;
+    const renderScale = deployedScale + (1 - deployedScale) * handoff;
     ctx.save();
     ctx.globalAlpha = clamp(reveal * 1.7, 0, 1);
-    ctx.translate(x, y - eased * 62 * scale);
-    ctx.scale(scale * (0.45 + eased * 0.55), scale * (0.45 + eased * 0.55));
-    ctx.globalCompositeOperation = "lighter";
-    ctx.shadowBlur = 24;
-    ctx.shadowColor = "#56f4ff";
-    const exhaust = ctx.createLinearGradient(0, 14, 0, 72);
-    exhaust.addColorStop(0, "#ffffff");
-    exhaust.addColorStop(0.25, "#56f4ff");
-    exhaust.addColorStop(1, "rgba(34, 86, 255, 0)");
-    ctx.fillStyle = exhaust;
-    ctx.beginPath();
-    ctx.moveTo(-8, 15);
-    ctx.lineTo(0, 74 + Math.sin(launchIntroElapsed * 18) * 7);
-    ctx.lineTo(8, 15);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.shadowBlur = 16;
-    const hull = ctx.createLinearGradient(-28, -32, 28, 26);
-    hull.addColorStop(0, "#ecfbff");
-    hull.addColorStop(0.34, "#7695a5");
-    hull.addColorStop(0.72, "#324b5a");
-    hull.addColorStop(1, "#122431");
-    ctx.fillStyle = hull;
-    ctx.strokeStyle = "#8cf6ff";
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(0, -39);
-    ctx.lineTo(10, -14);
-    ctx.lineTo(34, 13);
-    ctx.lineTo(17, 24);
-    ctx.lineTo(0, 17);
-    ctx.lineTo(-17, 24);
-    ctx.lineTo(-34, 13);
-    ctx.lineTo(-10, -14);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#07364a";
-    ctx.strokeStyle = "#56f4ff";
-    ctx.beginPath();
-    ctx.moveTo(0, -27);
-    ctx.lineTo(6, -9);
-    ctx.lineTo(0, 5);
-    ctx.lineTo(-6, -9);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#ff6b2c";
-    ctx.shadowColor = "#ff6b2c";
-    ctx.shadowBlur = 9;
-    ctx.fillRect(-29, 12, 5, 2);
-    ctx.fillRect(24, 12, 5, 2);
+    drawShip(renderX, renderY, renderScale, 0, 18 * emerged * (1 - handoff));
     ctx.restore();
   }
 
   function drawLaunchIntroTypography(time) {
     const narrow = width < 700;
+    const handoff = introEase((time - 7.02) / 0.98);
     const titleX = narrow ? width * 0.5 : width * 0.065;
     const titleAlign = narrow ? "center" : "left";
-    const titleAlpha = 1 - clamp((time - 4.25) / 0.8, 0, 1);
+    const titleAlpha = 1 - clamp((time - 2.82) / 0.62, 0, 1);
     ctx.save();
     ctx.textAlign = titleAlign;
     ctx.textBaseline = "alphabetic";
-    ctx.globalAlpha = titleAlpha;
+    ctx.globalAlpha = titleAlpha * (1 - handoff);
     ctx.fillStyle = "#8da2ba";
     ctx.font = `800 ${clamp(width * 0.016, 11, 18)}px ui-monospace, monospace`;
     ctx.fillText("THE MISSION:", titleX, narrow ? height * 0.105 : height * 0.115);
@@ -2895,13 +3035,13 @@
     ctx.fillText("EXPLORE SPACE", titleX, narrow ? height * 0.16 : height * 0.205);
     ctx.shadowBlur = 0;
 
-    if (time >= 0.58 && time < 3.55) {
-      const number = time < 1.68 ? 3 : time < 2.64 ? 2 : 1;
-      const cueStart = number === 3 ? 0.58 : number === 2 ? 1.58 : 2.54;
+    if (time >= 0.4 && time < 3.25) {
+      const number = time < 1.42 ? 3 : time < 2.34 ? 2 : 1;
+      const cueStart = number === 3 ? 0.4 : number === 2 ? 1.34 : 2.26;
       const pulse = clamp((time - cueStart) / 0.22, 0, 1);
       const countX = narrow ? width * 0.78 : width * 0.82;
       const countY = narrow ? height * 0.42 : height * 0.48;
-      ctx.globalAlpha = 0.92;
+      ctx.globalAlpha = 0.92 * (1 - handoff);
       ctx.textAlign = "center";
       ctx.fillStyle = "#67efff";
       ctx.font = `800 ${clamp(width * 0.014, 10, 16)}px ui-monospace, monospace`;
@@ -2912,6 +3052,9 @@
       ctx.font = `900 ${clamp(Math.min(width, height) * 0.2, 74, 184)}px Arial Narrow, sans-serif`;
       ctx.fillText(String(number), countX, countY + clamp(width * 0.04, 35, 62));
       ctx.shadowBlur = 0;
+      ctx.fillStyle = number === 3 ? "#dff8ff" : number === 2 ? "#7eeaff" : "#ffb45f";
+      ctx.font = `900 ${clamp(width * 0.011, 9, 13)}px ui-monospace, monospace`;
+      ctx.fillText(number === 3 ? "TANK VENTING · VAPOUR PURGE" : number === 2 ? "WATER DELUGE · PAD COOLING" : "ENGINE IGNITION · THRUST BUILDING", countX, countY + clamp(width * 0.075, 74, 112));
       ctx.strokeStyle = `rgba(86, 244, 255, ${0.25 + pulse * 0.55})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2919,16 +3062,18 @@
       ctx.stroke();
     }
 
-    let status = "LAUNCH SYSTEMS · GO";
-    if (time >= 3.55) status = "LIFTOFF · EARTH DEPARTURE";
-    if (time >= 5.52) status = "BOOSTER SEPARATION · CONFIRMED";
-    if (time >= 6.42) status = "FAIRING RELEASE · STARFALL DEPLOY";
-    if (time >= 7.24) status = "STARFALL ONLINE · MISSION 01";
-    ctx.globalAlpha = 1;
+    let status = "TANK VENTING · CRYOGENIC VAPOUR PURGE";
+    if (time >= 1.42) status = "WATER DELUGE · PAD AND ENGINE COOLING";
+    if (time >= 2.34) status = "ENGINE IGNITION · FULL THRUST";
+    if (time >= 3.25) status = "LIFTOFF · EARTH DEPARTURE";
+    if (time >= 5.25) status = "BOOSTER SEPARATION · CONFIRMED";
+    if (time >= 6.05) status = "FAIRING RELEASE · STARFALL DEPLOY";
+    if (time >= 7.02) status = "STARFALL ONLINE · PILOT CONTROL TRANSFER";
+    ctx.globalAlpha = 1 - handoff;
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(1, 5, 12, 0.76)";
     ctx.fillRect(0, height - 49, width, 49);
-    ctx.fillStyle = time >= 7.24 ? "#43ffc0" : "#75efff";
+    ctx.fillStyle = time >= 7.02 ? "#43ffc0" : "#75efff";
     ctx.font = `800 ${clamp(width * 0.012, 9, 14)}px ui-monospace, monospace`;
     ctx.fillText(status, 22, height - 21);
     ctx.textAlign = "right";
@@ -2938,7 +3083,7 @@
     ctx.fillRect(0, height - 4, width, 4);
     ctx.fillStyle = "#56f4ff";
     ctx.fillRect(0, height - 4, width * clamp(time / LAUNCH_INTRO_DURATION, 0, 1), 4);
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.7 * (1 - handoff);
     ctx.textAlign = "right";
     ctx.fillStyle = "#d6e8f1";
     ctx.font = `700 ${clamp(width * 0.01, 8, 11)}px ui-monospace, monospace`;
@@ -2948,17 +3093,19 @@
 
   function drawLaunchIntro() {
     const time = launchIntroElapsed;
-    const launchProgress = introEase((time - 3.55) / 2.05);
-    const spaceMix = introEase((time - 4.4) / 2.25);
-    const separation = introEase((time - 5.52) / 0.95);
-    const reveal = introEase((time - 6.42) / 1.18);
+    const launchProgress = introEase((time - 3.25) / 2.05);
+    const spaceMix = introEase((time - 4.12) / 2.25);
+    const separation = introEase((time - 5.25) / 0.88);
+    const reveal = introEase((time - 6.05) / 0.92);
+    const handoff = introEase((time - 7.02) / 0.98);
     const scale = clamp(Math.min(width / 1160, height / 790), 0.58, 1.18) * (1 - launchProgress * 0.18);
     const initialRocketY = height * 0.64;
     const rocketX = width * 0.5;
-    const rocketY = initialRocketY + (height * 0.31 - initialRocketY) * launchProgress;
+    const rocketY = initialRocketY + (height * 0.27 - initialRocketY) * launchProgress;
     const padY = initialRocketY + 89 * scale;
 
     ctx.save();
+    ctx.globalAlpha = 1 - handoff;
     const sky = ctx.createLinearGradient(0, 0, 0, height);
     sky.addColorStop(0, `rgba(1, 5, 15, ${0.48 - spaceMix * 0.28})`);
     sky.addColorStop(0.62, `rgba(9, 37, 66, ${0.82 - spaceMix * 0.7})`);
@@ -2967,19 +3114,18 @@
     ctx.fillRect(0, 0, width, height);
     drawCinematicEarth(launchProgress, spaceMix);
     drawLaunchPad(rocketX, padY, scale, 1 - clamp(launchProgress * 1.55, 0, 1));
-
-    const ignition = clamp((time - 3.34) / 0.34, 0, 1);
+    drawPrelaunchVapour(time, rocketX, rocketY, scale);
+    drawWaterDeluge(time, rocketX, padY, scale);
+    const ignition = clamp((time - 2.58) / 0.48, 0, 1);
     drawCinematicSmoke(time, rocketX, rocketY + 80 * scale, padY, scale, launchProgress);
     drawCinematicPlume(rocketX, rocketY + 78 * scale, scale, ignition * (1 - reveal), launchProgress);
     drawCinematicRocket(rocketX, rocketY, scale, time, separation, reveal);
-    drawCinematicSpacecraft(rocketX, rocketY - 58 * scale, scale * 1.45, reveal);
-
-    if (time > 7.55) {
-      ctx.globalAlpha = clamp((time - 7.55) / 0.45, 0, 1) * 0.32;
-      ctx.fillStyle = "#dffbff";
-      ctx.fillRect(0, 0, width, height);
-    }
     ctx.restore();
+
+    if (solarPlanets[0] && handoff > 0) {
+      drawSolarPlanet(solarPlanets[0], handoff);
+    }
+    drawCinematicSpacecraft(rocketX, rocketY - 58 * scale, scale * 1.45, reveal, handoff);
     drawLaunchIntroTypography(time);
   }
 
@@ -3220,9 +3366,10 @@
     ctx.restore();
   }
 
-  function drawSolarPlanet(planet) {
+  function drawSolarPlanet(planet, renderAlpha = 1) {
     const { type, radius: r } = planet;
     ctx.save();
+    ctx.globalAlpha = renderAlpha;
     ctx.translate(planet.x, planet.y);
 
     if (type.id === "sun") {
@@ -3252,7 +3399,7 @@
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, TAU);
       ctx.clip();
-      ctx.globalAlpha = 0.38;
+      ctx.globalAlpha = 0.38 * renderAlpha;
       ctx.strokeStyle = "#fff4a4";
       for (let band = -5; band <= 5; band += 1) {
         const y = band * r * 0.16 + Math.sin(planet.phase * 0.8 + band) * r * 0.045;
@@ -3331,7 +3478,7 @@
       ctx.fillStyle = "rgba(238, 252, 255, 0.92)";
       ctx.fillRect(-r, -r, r * 2, r * 0.08);
       ctx.fillRect(-r, r * 0.91, r * 2, r * 0.09);
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.5 * renderAlpha;
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = Math.max(2, r * 0.025);
       for (let i = -2; i <= 2; i += 1) {
@@ -3351,7 +3498,7 @@
         ctx.stroke();
       }
     } else if (type.id === "venus") {
-      ctx.globalAlpha = 0.42;
+      ctx.globalAlpha = 0.42 * renderAlpha;
       for (let band = -6; band <= 6; band += 1) {
         const y = band * r * 0.14;
         ctx.strokeStyle = band % 2 === 0 ? "#fff0bc" : "#9f622f";
@@ -3385,7 +3532,7 @@
     } else if (type.id === "jupiter" || type.id === "saturn") {
       for (let i = -7; i <= 7; i += 1) {
         const y = i * r * 0.13;
-        ctx.globalAlpha = 0.28 + (i % 2 === 0 ? 0.18 : 0);
+        ctx.globalAlpha = (0.28 + (i % 2 === 0 ? 0.18 : 0)) * renderAlpha;
         ctx.strokeStyle = i % 3 === 0 ? type.colors[2] : i % 2 === 0 ? type.colors[1] : "#fff1d2";
         ctx.lineWidth = r * (type.id === "jupiter" && i % 3 === 0 ? 0.09 : 0.052);
         ctx.beginPath();
@@ -3394,14 +3541,14 @@
         ctx.stroke();
       }
       if (type.id === "jupiter") {
-        ctx.globalAlpha = 0.66;
+        ctx.globalAlpha = 0.66 * renderAlpha;
         ctx.fillStyle = "#a74637";
         ctx.beginPath();
         ctx.ellipse(r * 0.34, r * 0.23, r * 0.2, r * 0.09, -0.08, 0, TAU);
         ctx.fill();
       }
     } else if (type.id === "uranus") {
-      ctx.globalAlpha = 0.22;
+      ctx.globalAlpha = 0.22 * renderAlpha;
       ctx.strokeStyle = "#e5ffff";
       ctx.lineWidth = r * 0.045;
       for (let i = -4; i <= 4; i += 1) {
@@ -3411,7 +3558,7 @@
         ctx.stroke();
       }
     } else if (type.id === "neptune") {
-      ctx.globalAlpha = 0.34;
+      ctx.globalAlpha = 0.34 * renderAlpha;
       ctx.strokeStyle = "#7db9ff";
       ctx.lineWidth = r * 0.055;
       for (let i = -4; i <= 4; i += 1) {
@@ -3430,14 +3577,14 @@
     limb.addColorStop(0, "rgba(255,255,255,0.15)");
     limb.addColorStop(0.58, "rgba(0,0,0,0.02)");
     limb.addColorStop(1, "rgba(0,0,0,0.86)");
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = renderAlpha;
     ctx.fillStyle = limb;
     ctx.fillRect(-r, -r, r * 2, r * 2);
     ctx.restore();
 
     ctx.strokeStyle = type.atmosphere;
     ctx.lineWidth = Math.max(2, r * 0.022);
-    ctx.globalAlpha = 0.72;
+    ctx.globalAlpha = 0.72 * renderAlpha;
     ctx.shadowBlur = Math.min(24, r * 0.16);
     ctx.shadowColor = type.atmosphere;
     ctx.beginPath();
@@ -3447,7 +3594,7 @@
     if (planet.rings) {
       ctx.save();
       ctx.rotate(ringTilt - planet.rotation);
-      ctx.globalAlpha = 0.72;
+      ctx.globalAlpha = 0.72 * renderAlpha;
       ctx.strokeStyle = type.id === "saturn" ? "#e6ca8f" : "#b6edf2";
       ctx.lineWidth = Math.max(4, r * 0.06);
       ctx.beginPath();
@@ -3458,7 +3605,7 @@
 
     ctx.rotate(-planet.rotation);
     ctx.shadowBlur = 0;
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.9 * renderAlpha;
     ctx.fillStyle = "#dffaff";
     ctx.font = "800 8px ui-monospace, monospace";
     ctx.textAlign = "center";
@@ -4490,9 +4637,10 @@
     ctx.restore();
   }
 
-  function drawShip() {
+  function drawShip(renderX = ship.x, renderY = ship.y, renderScale = 1, renderTilt = ship.tilt, thrustBoost = 0) {
     ctx.save();
-    ctx.translate(ship.x, ship.y);
+    ctx.translate(renderX, renderY);
+    ctx.scale(renderScale, renderScale);
     if (ship.invulnerable > 0 && Math.floor(ship.invulnerable * 16) % 2 === 0) ctx.globalAlpha = 0.38;
     if (cloakTimer > 0) ctx.globalAlpha = 0.16 + Math.sin(elapsed * 11) * 0.045;
 
@@ -4540,12 +4688,12 @@
       ctx.restore();
     }
 
-    ctx.rotate(ship.tilt);
+    ctx.rotate(renderTilt);
 
     // Multi-nozzle ion drive. Overdrive upgrades add a brighter central engine.
     const enginePositions = upgrades.fireRate + upgrades.engine >= 2 ? [-13, 0, 13] : [-11, 11];
     for (const engineX of enginePositions) {
-      const thrust = state === "running" ? random(18, 28 + upgrades.fireRate * 3 + upgrades.engine * 5) : 12;
+      const thrust = state === "running" || thrustBoost > 0 ? random(18, 28 + upgrades.fireRate * 3 + upgrades.engine * 5) + thrustBoost : 12;
       const flame = ctx.createLinearGradient(engineX, 13, engineX, 15 + thrust);
       flame.addColorStop(0, "#ffffff");
       flame.addColorStop(0.2, upgrades.fireRate >= 3 ? "#b56cff" : "#56f4ff");
@@ -5267,6 +5415,16 @@
       sfxVoice({ start: 48, end: 74, duration: 3.25, volume: 0.13, shape: "sine", pan: -0.16 });
       sfxVoice({ start: 96, end: 148, duration: 3.1, volume: 0.055, shape: "triangle", pan: 0.16 });
       sfxNoise({ duration: 3.15, volume: 0.035, frequency: 110, endFrequency: 680, filterType: "bandpass" });
+    } else if (type === "vent") {
+      sfxNoise({ duration: 0.78, volume: 0.08, frequency: 3400, endFrequency: 760, filterType: "highpass", pan: -0.36 });
+      sfxNoise({ duration: 0.68, volume: 0.065, frequency: 2800, endFrequency: 620, filterType: "highpass", delay: 0.11, pan: 0.34 });
+    } else if (type === "deluge") {
+      sfxNoise({ duration: 1.18, volume: 0.11, frequency: 2400, endFrequency: 260, filterType: "bandpass" });
+      sfxVoice({ start: 96, end: 58, duration: 0.82, volume: 0.065, shape: "sine", delay: 0.08 });
+    } else if (type === "ignition") {
+      sfxVoice({ start: 42, end: 88, duration: 0.95, volume: 0.19, shape: "sine" });
+      sfxVoice({ start: 78, end: 320, duration: 0.74, volume: 0.09, shape: "sawtooth", delay: 0.05 });
+      sfxNoise({ duration: 0.92, volume: 0.18, frequency: 130, endFrequency: 1500, filterType: "bandpass" });
     } else if (type === "countdown") {
       const note = 520 + (3 - strength) * 125;
       sfxVoice({ start: note, end: note * 0.98, duration: 0.22, volume: 0.13, shape: "square" });
@@ -5382,8 +5540,9 @@
   document.querySelectorAll(".weapon-slot").forEach((card) => {
     card.addEventListener("click", () => selectWeapon(card.dataset.weapon));
   });
-  document.querySelectorAll("[data-fabricate]").forEach((button) => {
-    button.addEventListener("click", () => fabricate(button.dataset.fabricate));
+  ui.upgradeList.addEventListener("click", (event) => {
+    const card = event.target.closest?.("[data-fabricate]");
+    if (card && !card.disabled) fabricate(card.dataset.fabricate);
   });
   document.querySelectorAll("[data-setting]").forEach((button) => {
     button.addEventListener("click", () => setFeatureSetting(button.dataset.setting, !settings[button.dataset.setting]));
