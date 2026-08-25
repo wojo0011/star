@@ -665,6 +665,12 @@ button {
   border-top-color: #ffb548;
 }
 
+#configPopover {
+  width: min(780px, calc(100vw - 32px));
+  background: linear-gradient(145deg, rgba(5, 12, 26, 0.97), rgba(13, 8, 28, 0.97));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.62), 0 0 42px rgba(181, 108, 255, 0.08);
+}
+
 .settings-note {
   margin: 8px 0 12px;
   color: var(--muted);
@@ -833,10 +839,198 @@ button {
 }
 
 .upgrade-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 9px;
+}
+
+.upgrade-group-title {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 0 0;
+  color: #d9b8ff;
+  font: 900 0.54rem ui-monospace, monospace;
+  letter-spacing: 0.13em;
+}
+
+.upgrade-group-title:first-child {
+  margin-top: 0;
+}
+
+.upgrade-group-title i {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(181, 108, 255, 0.42), transparent);
+}
+
+.upgrade-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 100px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--upgrade-color) 35%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--upgrade-color) 9%, rgba(5, 11, 23, 0.92)), rgba(5, 11, 23, 0.94));
+  transition: border-color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.upgrade-card::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  bottom: -45px;
+  width: 90px;
+  height: 90px;
+  border: 1px solid color-mix(in srgb, var(--upgrade-color) 20%, transparent);
+  border-radius: 50%;
+}
+
+.upgrade-card.locked {
+  opacity: 0.48;
+  filter: saturate(0.55);
+}
+
+.upgrade-card.installed {
+  border-color: color-mix(in srgb, var(--upgrade-color) 66%, transparent);
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--upgrade-color) 7%, transparent);
+}
+
+.upgrade-card.active {
+  animation: upgrade-card-pulse 1.8s ease-in-out infinite;
+}
+
+.upgrade-card:hover {
+  z-index: 1;
+  border-color: var(--upgrade-color);
+  transform: translateY(-2px);
+  opacity: 1;
+}
+
+.upgrade-picture {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--upgrade-color) 26%, transparent);
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--upgrade-color) 17%, transparent), transparent 64%);
+  color: var(--upgrade-color);
+}
+
+.upgrade-picture::before,
+.upgrade-picture::after {
+  content: "";
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border: 1px solid color-mix(in srgb, var(--upgrade-color) 20%, transparent);
+  border-radius: 50%;
+}
+
+.upgrade-picture::after {
+  width: 38px;
+  height: 38px;
+  border-style: dashed;
+  animation: upgrade-schematic-spin 8s linear infinite;
+}
+
+.upgrade-picture svg {
+  position: relative;
+  z-index: 1;
+  width: 62px;
+  height: 58px;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--upgrade-color) 52%, transparent));
+}
+
+.upgrade-picture svg g {
+  fill: rgba(5, 13, 25, 0.84);
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.upgrade-picture > span {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  z-index: 2;
+  color: var(--upgrade-color);
+  font: 900 0.37rem ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+
+.upgrade-card-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  padding: 8px;
+}
+
+.upgrade-card-copy > small {
+  display: block;
+  color: var(--upgrade-color);
+  font: 800 0.4rem ui-monospace, monospace;
+  letter-spacing: 0.1em;
+}
+
+.upgrade-card-copy > strong {
+  display: block;
+  margin-top: 2px;
+  color: #eefaff;
+  font: 900 0.61rem/1.15 ui-monospace, monospace;
+  text-transform: uppercase;
+}
+
+.upgrade-card-copy p {
+  min-height: 25px;
+  margin: 5px 0 7px;
+  color: rgba(209, 228, 237, 0.68);
+  font-size: 0.48rem;
+  line-height: 1.35;
+}
+
+.upgrade-level {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.upgrade-level > span {
+  overflow: hidden;
+  color: var(--upgrade-color);
+  font: 900 0.4rem ui-monospace, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upgrade-level b {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.upgrade-level i {
+  width: 8px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.upgrade-level i.filled {
+  background: var(--upgrade-color);
+  box-shadow: 0 0 7px var(--upgrade-color);
+}
+
+@keyframes upgrade-schematic-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes upgrade-card-pulse {
+  50% { box-shadow: inset 0 0 30px color-mix(in srgb, var(--upgrade-color) 14%, transparent), 0 0 14px color-mix(in srgb, var(--upgrade-color) 16%, transparent); }
 }
 
 .upgrade-chip,
@@ -939,7 +1133,7 @@ button {
 
 .fabricator-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
@@ -1118,6 +1312,15 @@ kbd {
   border-radius: 2px;
   background: #ffb548;
   box-shadow: 0 0 11px #ff7045;
+}
+
+.radar-dot.hostile-dot.array-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #45b8ff;
+  border: 1px solid #ff5570;
+  box-shadow: 0 0 5px #45b8ff, 0 0 10px #ff425f;
 }
 
 @keyframes sweep {
@@ -1696,6 +1899,38 @@ kbd {
     color: white;
     background: rgba(158, 50, 14, 0.32);
     box-shadow: inset 0 0 25px rgba(255, 107, 44, 0.12);
+  }
+}
+
+@media (max-width: 940px) {
+  #configPopover .upgrade-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  #configPopover {
+    width: calc(100vw - 18px);
+  }
+
+  #configPopover .upgrade-list {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+    margin-top: 9px;
+  }
+
+  #configPopover .fabricator-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .upgrade-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    min-height: 92px;
+  }
+
+  .upgrade-picture svg {
+    width: 55px;
+    height: 52px;
   }
 }
 
