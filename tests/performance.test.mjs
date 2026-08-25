@@ -89,6 +89,34 @@ source = source.replace(bootMarker, `  globalThis.__starPerformanceTest = {
     limits: PERFORMANCE_LIMITS,
     getState() { return state; },
     getLaunchIntroElapsed() { return launchIntroElapsed; },
+    startTestAssist(path = [0.25, 0.5, 0.75]) {
+      state = "running";
+      mission = 1;
+      spawnGravityAssist({ id: "test", assist: { label: "TEST FLYBY", path, color: "#56f4ff", gateSpeed: 160 } });
+    },
+    passNextAssistGate() {
+      const gate = activeGravityAssist?.gates.find((candidate) => !candidate.resolved);
+      if (!gate) return;
+      ship.x = gravityGateX(gate);
+      gate.y = ship.y - 1;
+      gate.lastRelative = -1;
+      updateGravityAssist(1 / 60);
+    },
+    missNextAssistGate() {
+      const gate = activeGravityAssist?.gates.find((candidate) => !candidate.resolved);
+      if (!gate) return;
+      ship.x = gravityGateX(gate) > width * 0.5 ? 0 : width;
+      gate.y = ship.y - 1;
+      gate.lastRelative = -1;
+      updateGravityAssist(1 / 60);
+    },
+    updateAssistFailure,
+    getAssistSnapshot() {
+      return activeGravityAssist ? { state: activeGravityAssist.state, passed: activeGravityAssist.passed } : null;
+    },
+    getAssistFailureTimer() { return assistFailureTimer; },
+    getShipPosition() { return { x: ship.x, y: ship.y }; },
+    getGameOverReason() { return ui.gameOverReason.textContent; },
     setStressMode() {
       state = "running";
       mission = 2;
@@ -164,6 +192,25 @@ game.draw();
 for (let frame = 0; frame < 242; frame += 1) game.update(1 / 30, frame * (1000 / 30));
 assert.equal(game.getState(), "running", "the eight-second launch cinematic should hand off to Mission 1");
 assert.equal(game.getLaunchIntroElapsed(), 8);
+
+game.startTestAssist();
+game.passNextAssistGate();
+game.passNextAssistGate();
+game.passNextAssistGate();
+assert.equal(game.getAssistSnapshot().state, "complete", "three correctly flown gates should complete the gravity assist");
+assert.equal(game.getAssistSnapshot().passed, 3, "all three gravity gates should be credited");
+
+game.startTestAssist([0.8, 0.5, 0.2]);
+game.missNextAssistGate();
+assert.equal(game.getState(), "assistfailed", "missing a required lane gate should start the failure sequence");
+assert.equal(game.getAssistFailureTimer(), 3, "gravity-assist failure should give a visible three-second trajectory loss");
+const failureStart = game.getShipPosition();
+game.updateAssistFailure(1);
+assert.ok(game.getShipPosition().y < failureStart.y, "the failed ship should visibly fly out of the mission corridor");
+assert.equal(game.getState(), "assistfailed", "the failed trajectory should remain visible during its countdown");
+game.updateAssistFailure(2.05);
+assert.equal(game.getState(), "gameover", "the mission should end when the three-second failure countdown expires");
+assert.equal(game.getGameOverReason(), "GRAVITY ASSIST FAILED · TRAJECTORY LOST");
 
 game.setStressMode();
 
