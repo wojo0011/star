@@ -24,7 +24,7 @@ Asteroids vary in size, speed, and durability. Missed asteroids leave the battle
 
 Most asteroids are ordinary rock and drop nothing. Rarer asteroids visibly contain common metals, silver, gold, titanium, beryllium, platinum-group metals, rare-earth metals, or radioactive metals. Destroying a mineral-bearing asteroid releases labelled elemental shards that can be collected and refined into matter units.
 
-Open **CFG** to view discovered elements and spend refined matter in the field fabricator. Damage is applied in three explicit stages: energy shield first, armour plating second, and hull integrity last. Each layer has its own HUD bar. Shields recharge slowly after a damage-free delay, while the fabricator provides separate immediate shield recharge, armour patch, and hull repair controls. Passive regeneration repairs hull damage.
+Open **CFG** to view the illustrated ship-systems gallery, discovered elements, and the field fabricator. Every permanent and temporary upgrade appears in an ordered Defence, Weapons, Flight, or Tactical section with its own vector schematic, description, installation state, level pips, and active timer. Damage is applied in three explicit stages: energy shield first, armour plating second, and hull integrity last. Each layer has its own HUD bar. Shields recharge slowly after a damage-free delay, while the fabricator provides separate immediate shield recharge, armour patch, and hull repair controls. Passive regeneration repairs hull damage.
 
 Fast diagonal shooting stars occasionally cross the battlefield. Contact damages the ship, but shooting stars that leave the screen cause no damage.
 
@@ -32,7 +32,9 @@ During Mission 2, rare fictional planets drift through the sector in varied size
 
 Hostile alien scouts, raiders, and gunships enter the field, manoeuvre continuously across the upper sector, and fire aimed energy bolts at the player. Their patrol phase begins from their actual arrival point so they never teleport between entry and patrol movement. Rarer orbital stations act as large rotating gun platforms. Hostiles may be unprotected, armored, shielded, or fortified with both defenses; armor reduces incoming damage while shields must be depleted before the hull can be hit. Their defense state is visible on the craft and in the status bars above it.
 
-The **OPT** panel can independently enable or disable asteroids, mineral drops, shooting stars, planets, alien ships, space stations, original mission music, sound effects, particle effects, and screen shake. Choices and separate music/SFX volume levels are saved locally. An audio-status monitor reports whether audio is locked, ready, muted, or actively playing. **Enable / Test Audio** explicitly resumes browser audio and plays a confirmation sound.
+Mission 2 also contains crimson and azure missile weapon arrays. Each destructible platform projects a visible red or blue laser sight and moving targeting reticle. The reticle gradually follows the ship while a percentage lock builds; only a complete lock launches a homing missile. Cloaking actively breaks the lock and prevents missile guidance from reacquiring the hidden ship. Weapon arrays, their missiles, and their feature toggle are tracked separately from alien ships and orbital stations.
+
+The **OPT** panel can independently enable or disable asteroids, mineral drops, shooting stars, planets, alien ships, space stations, missile weapon arrays, original mission music, sound effects, particle effects, and screen shake. Choices and separate music/SFX volume levels are saved locally. An audio-status monitor reports whether audio is locked, ready, muted, or actively playing. **Enable / Test Audio** explicitly resumes browser audio and plays a confirmation sound.
 
 ## Original score and sound design
 
