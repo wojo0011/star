@@ -172,9 +172,9 @@
     neptune: { id: "neptune", name: "Neptune", colors: ["#2455b9", "#4a8be1", "#182d75"], atmosphere: "#5597ff" },
   };
   const solarMissionEvents = [
-    { at: 5, id: "sun", side: -0.07, radius: 230, speed: 35, edge: true, label: "SOLAR GRAVITY ASSIST" },
-    { at: 12, id: "mercury", side: 0.74, radius: 35, speed: 64 },
-    { at: 20, id: "venus", side: 0.24, radius: 61, speed: 57 },
+    { at: 5, id: "sun", side: -0.07, radius: 230, speed: 35, edge: true, label: "SOLAR GRAVITY ASSIST", assist: { label: "SOLAR SLINGSHOT", path: [0.72, 0.54, 0.36], color: "#ffb548", gateSpeed: 158 } },
+    { at: 12, id: "mercury", side: 0.74, radius: 35, speed: 64, assist: { label: "MERCURY FLYBY", path: [0.3, 0.5, 0.7], color: "#a9d4ee", gateSpeed: 162 } },
+    { at: 20, id: "venus", side: 0.24, radius: 61, speed: 57, assist: { label: "VENUS GRAVITY ASSIST", path: [0.7, 0.48, 0.3], color: "#ffd47b", gateSpeed: 158 } },
     { at: 30, id: "mars", side: 0.77, radius: 64, speed: 54 },
     { at: 68, id: "jupiter", side: 0.78, radius: 142, speed: 51 },
     { at: 82, id: "saturn", side: 0.24, radius: 112, speed: 55, rings: true },
@@ -194,6 +194,8 @@
     { at: 116, type: "telescope", label: "HELIOPAUSE TELESCOPE", side: 0.74, scale: 1.12 },
   ];
   const SOLAR_MISSION_DURATION = 128;
+  const GRAVITY_GATE_COUNT = 3;
+  const WEAPONS_TRAINING_KILLS = 6;
   const LAUNCH_INTRO_DURATION = 8;
   const launchIntroCues = [
     { at: 0.12, type: "introPulse", strength: 1 },
@@ -259,6 +261,13 @@
   let solarEventIndex = 0;
   let solarEquipmentIndex = 0;
   let beltAnnounced = false;
+  let activeGravityAssist = null;
+  let gravityAssistSuccesses = 0;
+  let assistFailureTimer = 0;
+  let assistFailureElapsed = 0;
+  let beltTrainingKills = 0;
+  let beltTrainingComplete = false;
+  let beltTrainingCompletionAnnounced = false;
   let configReturnState = null;
   let settingsReturnState = null;
   let score = 0;
@@ -463,6 +472,13 @@
     solarEventIndex = 0;
     solarEquipmentIndex = 0;
     beltAnnounced = false;
+    activeGravityAssist = null;
+    gravityAssistSuccesses = 0;
+    assistFailureTimer = 0;
+    assistFailureElapsed = 0;
+    beltTrainingKills = 0;
+    beltTrainingComplete = false;
+    beltTrainingCompletionAnnounced = false;
     asteroids.length = 0;
     projectiles.length = 0;
     particles.length = 0;
@@ -587,6 +603,9 @@
     alienClock = 0;
     stationClock = 0;
     weaponArrayClock = 0;
+    activeGravityAssist = null;
+    assistFailureTimer = 0;
+    assistFailureElapsed = 0;
     nextShootingStar = random(7, 12);
     nextPlanet = random(24, 40);
     nextAlien = random(10, 17);
@@ -632,7 +651,7 @@
   }
 
   function togglePause(forceResume = false) {
-    if (state === "idle" || state === "intro" || state === "gameover" || state === "missioncomplete" || state === "config" || state === "options") return;
+    if (state === "idle" || state === "intro" || state === "assistfailed" || state === "gameover" || state === "missioncomplete" || state === "config" || state === "options") return;
     if (state === "paused" || forceResume) {
       state = "running";
       ui.pause.classList.remove("visible");
@@ -647,7 +666,7 @@
   }
 
   function setConfigOpen(open) {
-    if (state === "intro" && open) return;
+    if ((state === "intro" || state === "assistfailed") && open) return;
     if (open && ui.configPopover.hidden) {
       if (!ui.settingsPopover.hidden) setSettingsOpen(false);
       configReturnState = state;
@@ -668,7 +687,7 @@
   }
 
   function setSettingsOpen(open) {
-    if (state === "intro" && open) return;
+    if ((state === "intro" || state === "assistfailed") && open) return;
     if (open && ui.settingsPopover.hidden) {
       if (!ui.configPopover.hidden) setConfigOpen(false);
       settingsReturnState = state;
@@ -849,9 +868,11 @@
     return { label: "Metallic asteroid", rockRatio: 0.12, metals: [{ id: first, amount: 2 }, { id: second, amount: 1 }] };
   }
 
-  function spawnAsteroid() {
+  function spawnAsteroid(training = false) {
     const roll = Math.random();
-    const type = roll < 0.48 ? "small" : roll < 0.82 ? "medium" : "large";
+    const type = training
+      ? roll < 0.7 ? "small" : roll < 0.94 ? "medium" : "large"
+      : roll < 0.48 ? "small" : roll < 0.82 ? "medium" : "large";
     const config = {
       small: { radius: random(14, 20), hp: 1, speed: random(105, 165), score: 100 },
       medium: { radius: random(24, 32), hp: 3, speed: random(76, 120), score: 260 },
@@ -890,7 +911,7 @@
       x: random(radius + 8, width - radius - 8),
       y: -radius - random(10, 100),
       vx: random(-18, 18),
-      vy: config.speed * (1 + (getWave() - 1) * 0.04),
+      vy: config.speed * (training ? 0.84 : 1) * (1 + (getWave() - 1) * 0.04),
       radius,
       hp: config.hp,
       maxHp: config.hp,
@@ -903,6 +924,7 @@
       composition,
       mineralPatches,
       flash: 0,
+      trainingTarget: training,
     });
   }
 
@@ -1032,6 +1054,11 @@
     if (cause !== "ship") {
       score += asteroid.score;
       destroyedCount += 1;
+      if (mission === 1 && asteroid.trainingTarget && !beltTrainingComplete) {
+        beltTrainingKills = Math.min(WEAPONS_TRAINING_KILLS, beltTrainingKills + 1);
+        ui.announcer.textContent = `Weapons training target destroyed. ${beltTrainingKills} of ${WEAPONS_TRAINING_KILLS}.`;
+        if (beltTrainingKills >= WEAPONS_TRAINING_KILLS) beltTrainingComplete = true;
+      }
       dropAsteroidResources(asteroid);
       const dropChance = asteroid.type === "large" ? 0.34 : asteroid.type === "medium" ? 0.17 : 0.08;
       if (destroyedCount === 5 && unlockedWeapons.size === 1) {
@@ -1450,6 +1477,126 @@
     showUpgradeToast(type.name.toUpperCase(), "PLANETARY BODY DETECTED");
   }
 
+  function gravityGateX(gate) {
+    const halfWidth = gravityGateWidth() * 0.5;
+    return clamp(width * gate.xRatio, halfWidth + 18, width - halfWidth - 18);
+  }
+
+  function gravityGateWidth() {
+    return clamp(width * 0.2, 110, 190);
+  }
+
+  function spawnGravityAssist(event) {
+    const { assist } = event;
+    activeGravityAssist = {
+      id: event.id,
+      label: assist.label,
+      color: assist.color,
+      speed: assist.gateSpeed,
+      passed: 0,
+      state: "active",
+      successTimer: 0,
+      age: 0,
+      gates: assist.path.map((xRatio, index) => ({
+        index,
+        xRatio,
+        y: 96 - index * 154,
+        lastRelative: -Infinity,
+        resolved: false,
+        passed: false,
+        pulse: random(0, TAU),
+      })),
+    };
+    for (const gate of activeGravityAssist.gates) gate.lastRelative = gate.y - ship.y;
+    showUpgradeToast("FOLLOW THE ARROWS · PASS 3 GATES", `${assist.label} · MANOEUVRING TRAINING`);
+    ui.announcer.textContent = `${assist.label}. Follow the arrow lane and fly through all three gates.`;
+    playTone("training");
+  }
+
+  function completeGravityAssist(lane) {
+    if (lane.state !== "active") return;
+    lane.state = "complete";
+    lane.successTimer = 1.6;
+    gravityAssistSuccesses += 1;
+    score += 600;
+    showUpgradeToast(`${lane.label} COMPLETE · ${gravityAssistSuccesses}/3`, "MANOEUVRING TRAINING PASSED");
+    ui.announcer.textContent = `${lane.label} complete. Gravity assist trajectory confirmed.`;
+    playTone("assistSuccess");
+  }
+
+  function failGravityAssist(lane, gate) {
+    if (state !== "running" || lane.state !== "active") return;
+    lane.state = "failed";
+    lane.failedGate = gate.index;
+    assistFailureTimer = 3;
+    assistFailureElapsed = 0;
+    state = "assistfailed";
+    keys.clear();
+    mobileFiring = false;
+    ship.vx = ship.x < width * 0.5 ? -145 : 145;
+    ship.vy = -215;
+    ship.invulnerable = 10;
+    showUpgradeToast("GRAVITY ASSIST FAILED", "TRAJECTORY LOST · MISSION ENDS IN 3");
+    ui.announcer.textContent = "Gravity assist failed. The ship is leaving the mission corridor. Mission ends in three seconds.";
+    updateMusicState();
+    playTone("assistFail");
+  }
+
+  function updateGravityAssist(dt) {
+    const lane = activeGravityAssist;
+    if (!lane) return;
+    lane.age += dt;
+    if (lane.state === "complete") {
+      lane.successTimer -= dt;
+      for (const gate of lane.gates) gate.y += lane.speed * dt;
+      if (lane.successTimer <= 0) activeGravityAssist = null;
+      return;
+    }
+    if (lane.state !== "active") return;
+    for (const gate of lane.gates) {
+      gate.pulse += dt * 4;
+      gate.y += lane.speed * dt;
+      const relative = gate.y - ship.y;
+      if (!gate.resolved && gate.lastRelative < 0 && relative >= 0) {
+        gate.resolved = true;
+        const gateCenter = gravityGateX(gate);
+        const safeHalfWidth = gravityGateWidth() * 0.5 - ship.radius * 0.45;
+        if (Math.abs(ship.x - gateCenter) <= safeHalfWidth) {
+          gate.passed = true;
+          lane.passed += 1;
+          score += 150;
+          createSparks(ship.x, ship.y, 10, lane.color);
+          pushShockwave({ x: ship.x, y: ship.y, radius: 8, maxRadius: gravityGateWidth() * 0.52, life: 0.34, maxLife: 0.34, color: lane.color });
+          ui.announcer.textContent = `${lane.label} gate ${lane.passed} of ${GRAVITY_GATE_COUNT} passed.`;
+          playTone("gate");
+          if (lane.passed >= GRAVITY_GATE_COUNT) completeGravityAssist(lane);
+        } else {
+          failGravityAssist(lane, gate);
+          return;
+        }
+      }
+      gate.lastRelative = relative;
+    }
+  }
+
+  function updateAssistFailure(dt) {
+    assistFailureTimer = Math.max(0, assistFailureTimer - dt);
+    assistFailureElapsed += dt;
+    if (activeGravityAssist) {
+      activeGravityAssist.age += dt;
+      for (const gate of activeGravityAssist.gates) gate.y += activeGravityAssist.speed * dt * 0.34;
+    }
+    const driftDirection = ship.vx < 0 ? -1 : 1;
+    ship.vx += driftDirection * 42 * dt;
+    ship.vy -= 36 * dt;
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+    ship.tilt += (driftDirection * 0.88 - ship.tilt) * Math.min(1, dt * 2.4);
+    screenShake = Math.max(screenShake * Math.pow(0.08, dt), assistFailureTimer > 2.55 ? 5 : 0);
+    updateHud(false);
+    if (assistFailureTimer <= 0) endGame("GRAVITY ASSIST FAILED · TRAJECTORY LOST");
+  }
+
   function spawnSolarPlanet(event) {
     const scale = clamp(width / 1100, 0.68, 1);
     const radius = event.radius * scale;
@@ -1467,7 +1614,8 @@
       collision: true,
       label: event.label || `${type.name.toUpperCase()} · SOLAR SYSTEM`,
     });
-    showUpgradeToast(event.id === "sun" ? "SOLAR GRAVITY ASSIST" : `${type.name.toUpperCase()} APPROACH`, "MISSION 01 · NAVIGATION");
+    if (event.assist) spawnGravityAssist(event);
+    else showUpgradeToast(event.id === "sun" ? "SOLAR GRAVITY ASSIST" : `${type.name.toUpperCase()} APPROACH`, "MISSION 01 · NAVIGATION");
   }
 
   function spawnSolarEquipment(event) {
@@ -1496,19 +1644,30 @@
       spawnSolarEquipment(solarEquipmentEvents[solarEquipmentIndex]);
       solarEquipmentIndex += 1;
     }
+    updateGravityAssist(dt);
+    if (state !== "running") return;
     if (!beltAnnounced && missionElapsed >= 38) {
       beltAnnounced = true;
-      showUpgradeToast("DENSE ASTEROID BELT", "MISSION 01 · SURVIVE");
-      ui.announcer.textContent = "Asteroid belt entered. Dodge or destroy incoming rocks.";
+      showUpgradeToast("FIRE WITH SPACE · DESTROY 6 TARGETS", "WEAPONS TRAINING · ASTEROID BELT");
+      ui.announcer.textContent = "Weapons training started. Press Space or the fire button and destroy six marked asteroids.";
+      playTone("training");
     }
+    if (!settings.asteroids && missionElapsed >= 38 && missionElapsed < 62) beltTrainingComplete = true;
     if (settings.asteroids && missionElapsed >= 38 && missionElapsed < 62) {
       const beltDelay = missionElapsed < 43 ? 0.86 : missionElapsed > 57 ? 0.92 : 0.68;
       spawnClock += dt;
       if (spawnClock >= beltDelay) {
         spawnClock -= beltDelay;
-        spawnAsteroid();
-        if (missionElapsed > 47 && missionElapsed < 56 && Math.random() < 0.14) spawnAsteroid();
+        spawnAsteroid(true);
+        if (missionElapsed > 47 && missionElapsed < 56 && Math.random() < 0.14) spawnAsteroid(true);
       }
+    }
+    if (!beltTrainingComplete && missionElapsed >= 61.9) missionElapsed = 61.9;
+    if (beltTrainingComplete && !beltTrainingCompletionAnnounced && missionElapsed >= 38) {
+      beltTrainingCompletionAnnounced = true;
+      showUpgradeToast(settings.asteroids ? "WEAPONS TRAINING COMPLETE" : "WEAPONS TRAINING BYPASSED", "MISSION 01 · PILOT QUALIFIED");
+      ui.announcer.textContent = settings.asteroids ? "Weapons training complete. Asteroid belt clearance confirmed." : "Asteroids disabled. Weapons training bypassed.";
+      playTone("assistSuccess");
     }
     if (missionElapsed >= SOLAR_MISSION_DURATION) completeMissionOne();
   }
@@ -1846,6 +2005,10 @@
     updateStars(dt);
     if (state === "intro") {
       updateLaunchIntro(dt);
+      return;
+    }
+    if (state === "assistfailed") {
+      updateAssistFailure(dt);
       return;
     }
     if (state !== "running") return;
@@ -2257,7 +2420,13 @@
   function updateMissionHud() {
     if (mission === 1) {
       ui.missionNumber.textContent = "MISSION 01 · SOLAR ESCAPE";
-      const objective = missionElapsed < 5
+      const objective = state === "assistfailed"
+        ? `GRAVITY ASSIST FAILED · MISSION ENDS IN ${Math.max(1, Math.ceil(assistFailureTimer))}`
+        : activeGravityAssist?.state === "active"
+          ? `TRAINING · FOLLOW ARROWS · GATE ${Math.min(GRAVITY_GATE_COUNT, activeGravityAssist.passed + 1)}/${GRAVITY_GATE_COUNT}`
+          : missionElapsed >= 38 && missionElapsed < 62 && !beltTrainingComplete
+            ? `WEAPONS TRAINING · DESTROY ${beltTrainingKills}/${WEAPONS_TRAINING_KILLS}`
+            : missionElapsed < 5
         ? "CLEAR EARTH ORBIT"
         : missionElapsed < 12
           ? "EXECUTE SOLAR GRAVITY ASSIST"
@@ -2380,11 +2549,13 @@
     const shakeY = settings.screenShake && screenShake ? random(-screenShake, screenShake) : 0;
     ctx.translate(shakeX, shakeY);
     drawGuideLines();
+    drawGravityAssistLane();
     for (const planet of solarPlanets) drawSolarPlanet(planet);
     for (const object of spaceObjects) drawSpaceObject(object);
     for (const planet of planets) drawPlanet(planet);
     for (const star of shootingStars) drawShootingStar(star);
     for (const asteroid of asteroids) drawAsteroid(asteroid);
+    drawWeaponsTrainingOverlay();
     for (const array of weaponArrays) drawWeaponArrayTargeting(array);
     for (const station of spaceStations) drawSpaceStation(station);
     for (const array of weaponArrays) drawWeaponArray(array);
@@ -2396,6 +2567,7 @@
     for (const projectile of projectiles) drawProjectile(projectile, simplifyProjectiles);
     drawEffects();
     if (state !== "gameover") drawShip();
+    drawAssistFailureOverlay();
     ctx.restore();
   }
 
@@ -2865,6 +3037,186 @@
       ctx.lineTo(x, height);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  function drawGravityAssistLane() {
+    const lane = activeGravityAssist;
+    if (!lane || mission !== 1) return;
+    const gateWidth = gravityGateWidth();
+    const currentGate = lane.gates.find((gate) => !gate.resolved) || lane.gates[lane.gates.length - 1];
+    const color = lane.state === "failed" ? "#ff425f" : lane.state === "complete" ? "#43ffc0" : lane.color;
+    const alpha = lane.state === "complete" ? clamp(lane.successTimer / 1.6, 0, 1) : 1;
+    const visibleGates = lane.gates.filter((gate) => gate.y > -110 && gate.y < height + 90);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = "lighter";
+
+    if (lane.state === "active" && currentGate) {
+      const centerX = gravityGateX(currentGate);
+      const approachTop = Math.max(72, currentGate.y + 28);
+      const approachBottom = Math.min(height, ship.y + 44);
+      const corridor = ctx.createLinearGradient(0, approachTop, 0, approachBottom);
+      corridor.addColorStop(0, `${color}10`);
+      corridor.addColorStop(0.55, `${color}28`);
+      corridor.addColorStop(1, `${color}08`);
+      ctx.fillStyle = corridor;
+      ctx.fillRect(centerX - gateWidth * 0.5, approachTop, gateWidth, Math.max(0, approachBottom - approachTop));
+      ctx.strokeStyle = `${color}66`;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([9, 11]);
+      ctx.lineDashOffset = -lane.age * 46;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(centerX + side * gateWidth * 0.5, approachTop);
+        ctx.lineTo(centerX + side * gateWidth * 0.5, approachBottom);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      for (let y = approachTop + 35 + ((lane.age * 72) % 70); y < approachBottom - 24; y += 70) {
+        ctx.save();
+        ctx.translate(centerX, y);
+        ctx.strokeStyle = `${color}dd`;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = color;
+        ctx.beginPath();
+        ctx.moveTo(-17, 8);
+        ctx.lineTo(0, -8);
+        ctx.lineTo(17, 8);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    const ordered = [...lane.gates].sort((a, b) => a.y - b.y);
+    if (ordered.length > 1) {
+      ctx.strokeStyle = `${color}88`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 9]);
+      ctx.lineDashOffset = -lane.age * 32;
+      ctx.beginPath();
+      ordered.forEach((gate, index) => {
+        const x = gravityGateX(gate);
+        if (index === 0) ctx.moveTo(x, gate.y);
+        else ctx.lineTo(x, gate.y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    for (const gate of visibleGates) {
+      const gateX = gravityGateX(gate);
+      const passedColor = gate.passed ? "#43ffc0" : gate.resolved ? "#ff425f" : color;
+      const isCurrent = gate === currentGate && lane.state === "active";
+      const pulse = isCurrent ? 1 + Math.sin(gate.pulse) * 0.08 : 1;
+      ctx.save();
+      ctx.translate(gateX, gate.y);
+      ctx.scale(pulse, pulse);
+      ctx.strokeStyle = passedColor;
+      ctx.fillStyle = `${passedColor}18`;
+      ctx.lineWidth = isCurrent ? 3 : 2;
+      ctx.shadowBlur = isCurrent ? 22 : 11;
+      ctx.shadowColor = passedColor;
+      ctx.fillRect(-gateWidth * 0.5, -16, gateWidth, 32);
+      ctx.beginPath();
+      ctx.moveTo(-gateWidth * 0.5, -24);
+      ctx.lineTo(-gateWidth * 0.5, 24);
+      ctx.lineTo(-gateWidth * 0.38, 24);
+      ctx.moveTo(gateWidth * 0.5, -24);
+      ctx.lineTo(gateWidth * 0.5, 24);
+      ctx.lineTo(gateWidth * 0.38, 24);
+      ctx.stroke();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = passedColor;
+      ctx.font = "900 10px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(gate.passed ? `GATE ${gate.index + 1} PASSED` : `GATE ${gate.index + 1} / ${GRAVITY_GATE_COUNT}`, 0, -29);
+      ctx.restore();
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = color;
+    ctx.font = "900 11px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(
+      `${lane.label} · ${lane.passed}/${GRAVITY_GATE_COUNT}`,
+      currentGate ? gravityGateX(currentGate) : width * 0.5,
+      currentGate ? clamp(currentGate.y + 31, 116, height - 190) : 116,
+    );
+    ctx.restore();
+  }
+
+  function drawWeaponsTrainingOverlay() {
+    if (mission !== 1 || missionElapsed < 38 || missionElapsed >= 62 || beltTrainingComplete) return;
+    const targets = asteroids.filter((asteroid) => asteroid.trainingTarget).slice(0, 8);
+    ctx.save();
+    for (const asteroid of targets) {
+      const r = asteroid.radius + 11 + Math.sin(elapsed * 5 + asteroid.rotation) * 2;
+      ctx.save();
+      ctx.translate(asteroid.x, asteroid.y);
+      ctx.strokeStyle = "#ffb548";
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ff8a32";
+      const corner = Math.min(12, r * 0.4);
+      for (const sideX of [-1, 1]) {
+        for (const sideY of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(sideX * (r - corner), sideY * r);
+          ctx.lineTo(sideX * r, sideY * r);
+          ctx.lineTo(sideX * r, sideY * (r - corner));
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    const panelWidth = Math.min(390, width - 28);
+    const panelX = width * 0.5 - panelWidth * 0.5;
+    const panelY = clamp(height - 285, 116, height - 168);
+    ctx.fillStyle = "rgba(2, 8, 18, 0.84)";
+    ctx.strokeStyle = "rgba(255, 181, 72, 0.62)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(panelX, panelY, panelWidth, 54);
+    ctx.strokeRect(panelX, panelY, panelWidth, 54);
+    ctx.fillStyle = "#ffcb72";
+    ctx.font = "900 11px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("WEAPONS TRAINING · SPACE / FIRE BUTTON", width * 0.5, panelY + 10);
+    ctx.fillStyle = "#d9f8ff";
+    ctx.font = "800 10px ui-monospace, monospace";
+    ctx.fillText(`MARKED TARGETS DESTROYED  ${beltTrainingKills} / ${WEAPONS_TRAINING_KILLS}`, width * 0.5, panelY + 31);
+    ctx.restore();
+  }
+
+  function drawAssistFailureOverlay() {
+    if (state !== "assistfailed") return;
+    const pulse = 0.48 + Math.sin(assistFailureElapsed * 8) * 0.12;
+    ctx.save();
+    const vignette = ctx.createRadialGradient(width * 0.5, height * 0.5, height * 0.22, width * 0.5, height * 0.5, height * 0.82);
+    vignette.addColorStop(0, "rgba(255, 30, 58, 0)");
+    vignette.addColorStop(1, `rgba(255, 22, 50, ${pulse})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "#ff2949";
+    ctx.fillStyle = "#ff526b";
+    ctx.font = `900 ${clamp(width * 0.032, 22, 44)}px ui-monospace, monospace`;
+    ctx.fillText("GRAVITY ASSIST FAILED", width * 0.5, height * 0.32);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#f5dbe0";
+    ctx.font = `900 ${clamp(width * 0.009, 8, 13)}px ui-monospace, monospace`;
+    ctx.fillText("TRAJECTORY LOST · SHIP LEAVING MISSION CORRIDOR", width * 0.5, height * 0.32 + 39);
+    ctx.fillStyle = "#ff8b9c";
+    ctx.font = `900 ${clamp(width * 0.045, 30, 62)}px ui-monospace, monospace`;
+    ctx.fillText(String(Math.max(1, Math.ceil(assistFailureTimer))), width * 0.5, height * 0.32 + 92);
     ctx.restore();
   }
 
@@ -4932,6 +5284,23 @@
       sfxVoice({ start: 48, end: 122, duration: 1.15, volume: 0.2, shape: "sine" });
       sfxVoice({ start: 96, end: 610, duration: 0.88, volume: 0.11, shape: "sawtooth", delay: 0.08 });
       sfxNoise({ duration: 1.1, volume: 0.2, frequency: 180, endFrequency: 2400, filterType: "bandpass" });
+    } else if (type === "training") {
+      [392, 523.25].forEach((note, index) => {
+        sfxVoice({ start: note, end: note * 1.08, duration: 0.32, volume: 0.085, shape: "triangle", delay: index * 0.14, pan: index ? 0.22 : -0.22 });
+      });
+      sfxVoice({ start: 980, end: 1320, duration: 0.18, volume: 0.04, shape: "sine", delay: 0.3 });
+    } else if (type === "gate") {
+      sfxVoice({ start: 740, end: 1480, duration: 0.2, volume: 0.09, shape: "sine" });
+      sfxVoice({ start: 1110, end: 1770, duration: 0.16, volume: 0.052, shape: "triangle", delay: 0.05 });
+    } else if (type === "assistSuccess") {
+      [392, 523.25, 659.25, 880].forEach((note, index) => {
+        sfxVoice({ start: note, end: note * 1.02, duration: 0.52, volume: 0.08, shape: "triangle", delay: index * 0.1, pan: (index - 1.5) * 0.18 });
+      });
+      sfxNoise({ duration: 0.5, volume: 0.035, frequency: 360, endFrequency: 3400, filterType: "bandpass" });
+    } else if (type === "assistFail") {
+      sfxVoice({ start: 520, end: 82, duration: 0.92, volume: 0.15, shape: "sawtooth", pan: -0.25 });
+      sfxVoice({ start: 390, end: 58, duration: 1.1, volume: 0.12, shape: "square", delay: 0.12, pan: 0.25 });
+      sfxNoise({ duration: 0.8, volume: 0.11, frequency: 2300, endFrequency: 110, filterType: "bandpass" });
     }
     refreshAudioStatus();
   }
@@ -4959,6 +5328,7 @@
       if (event.code === "Space" || event.code === "Enter") completeLaunchIntro();
       return;
     }
+    if (state === "assistfailed") return;
     if (event.code === "Tab" && !event.repeat) {
       event.preventDefault();
       if (state !== "gameover") setConfigOpen(ui.configPopover.hidden);
