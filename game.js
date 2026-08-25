@@ -180,6 +180,10 @@
     { id: "raider", name: "Alien raider", radius: 29, hp: 7, speed: 66, score: 760, color: "#c86cff" },
     { id: "gunship", name: "Alien gunship", radius: 36, hp: 11, speed: 48, score: 1250, color: "#ff7654" },
   ];
+  const weaponArrayTypes = [
+    { id: "crimson", name: "Crimson missile array", color: "#ff425f", lockDuration: 4.2, missileSpeed: 255, turnRate: 1.7, damage: 20 },
+    { id: "azure", name: "Azure missile array", color: "#45b8ff", lockDuration: 5.1, missileSpeed: 225, turnRate: 2.05, damage: 16 },
+  ];
   const defaultSettings = {
     asteroids: true,
     mineralDrops: true,
@@ -187,6 +191,7 @@
     planets: true,
     alienShips: true,
     spaceStations: true,
+    weaponArrays: true,
     music: true,
     soundFx: true,
     particles: true,
@@ -266,6 +271,8 @@
   let nextAlien = random(10, 17);
   let stationClock = 0;
   let nextStation = random(34, 55);
+  let weaponArrayClock = 0;
+  let nextWeaponArray = random(22, 36);
   let hostileSequence = 0;
 
   const keys = new Set();
@@ -282,6 +289,7 @@
   const spaceObjects = [];
   const alienShips = [];
   const spaceStations = [];
+  const weaponArrays = [];
   const enemyProjectiles = [];
   const mobileVector = { x: 0, y: 0 };
   const resourceInventory = {};
@@ -370,6 +378,8 @@
     nextAlien = random(10, 17);
     stationClock = 0;
     nextStation = random(34, 55);
+    weaponArrayClock = 0;
+    nextWeaponArray = random(22, 36);
     hostileSequence = 0;
     matterBalance = 0;
     timeSinceDamage = 0;
@@ -391,6 +401,7 @@
     spaceObjects.length = 0;
     alienShips.length = 0;
     spaceStations.length = 0;
+    weaponArrays.length = 0;
     enemyProjectiles.length = 0;
     Object.keys(resourceInventory).forEach((key) => delete resourceInventory[key]);
     Object.keys(upgrades).forEach((key) => { upgrades[key] = 0; });
@@ -454,6 +465,7 @@
     for (const asteroid of asteroids) asteroid.alive = false;
     for (const enemy of alienShips) enemy.alive = false;
     for (const station of spaceStations) station.alive = false;
+    for (const array of weaponArrays) array.alive = false;
     asteroids.length = 0;
     projectiles.length = 0;
     particles.length = 0;
@@ -466,6 +478,7 @@
     spaceObjects.length = 0;
     alienShips.length = 0;
     spaceStations.length = 0;
+    weaponArrays.length = 0;
     enemyProjectiles.length = 0;
     elapsed = 0;
     missionElapsed = 0;
@@ -474,10 +487,12 @@
     planetClock = 0;
     alienClock = 0;
     stationClock = 0;
+    weaponArrayClock = 0;
     nextShootingStar = random(7, 12);
     nextPlanet = random(24, 40);
     nextAlien = random(10, 17);
     nextStation = random(34, 55);
+    nextWeaponArray = random(22, 36);
     ship.x = width / 2;
     ship.y = height * 0.82;
     ship.vx = 0;
@@ -622,14 +637,21 @@
       for (const enemy of alienShips) enemy.alive = false;
       alienShips.length = 0;
       for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
-        if (!enemyProjectiles[i].stationBolt) enemyProjectiles.splice(i, 1);
+        if (enemyProjectiles[i].sourceKind === "ship") enemyProjectiles.splice(i, 1);
       }
     }
     if (!settings.spaceStations) {
       for (const station of spaceStations) station.alive = false;
       spaceStations.length = 0;
       for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
-        if (enemyProjectiles[i].stationBolt) enemyProjectiles.splice(i, 1);
+        if (enemyProjectiles[i].sourceKind === "station") enemyProjectiles.splice(i, 1);
+      }
+    }
+    if (!settings.weaponArrays) {
+      for (const array of weaponArrays) array.alive = false;
+      weaponArrays.length = 0;
+      for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
+        if (enemyProjectiles[i].sourceKind === "array") enemyProjectiles.splice(i, 1);
       }
     }
     if (!settings.particles) {
@@ -1073,24 +1095,70 @@
     toastTimer = window.setTimeout(() => ui.upgradeToast.classList.remove("visible"), 2200);
   }
 
+  const upgradeCatalog = [
+    { group: "01 · DEFENCE", type: "shield", name: "Shield Array", max: 4, color: "#63b8ff", description: "Absorbs damage before armour." },
+    { group: "01 · DEFENCE", type: "shieldOvercharge", name: "Shield Overcharge", max: 4, color: "#9bdcff", description: "Raises capacity and recharge speed." },
+    { group: "01 · DEFENCE", type: "armor", name: "Armour Plating", max: 4, color: "#d8e4ec", description: "Sacrificial layer ahead of the hull." },
+    { group: "01 · DEFENCE", type: "regeneration", name: "Hull Regeneration", max: 4, color: "#52ff9b", description: "Repairs hull after combat quiets." },
+    { group: "02 · WEAPONS", type: "fireRate", name: "Overdrive", max: 5, color: "#ff9f45", description: "Permanently reduces weapon delay." },
+    { group: "02 · WEAPONS", type: "wideShot", name: "Wide Shot", max: 4, color: "#56f4ff", description: "Adds outboard cannons and lanes." },
+    { group: "02 · WEAPONS", type: "ricochet", name: "Laser Ricochet", max: 3, color: "#71f7ff", description: "Bounces between unhit targets." },
+    { group: "02 · WEAPONS", type: "missile", name: "Seeker Missiles", max: 3, color: "#ff8345", description: "Unlocks homing explosive payloads." },
+    { group: "02 · WEAPONS", type: "plasma", name: "Plasma Cannon", max: 3, color: "#b56cff", description: "Piercing high-energy projectiles." },
+    { group: "02 · WEAPONS", type: "railgun", name: "Rail Driver", max: 3, color: "#ffe36e", description: "Heavy rounds with deep penetration." },
+    { group: "03 · FLIGHT & SYSTEMS", type: "engine", name: "Engine Thrust", max: 4, color: "#ff9d4a", description: "Increases maximum flight speed." },
+    { group: "03 · FLIGHT & SYSTEMS", type: "maneuver", name: "Manoeuvring", max: 4, color: "#46e6ff", description: "Sharpens directional response." },
+    { group: "03 · FLIGHT & SYSTEMS", type: "magnet", name: "Magnetic Capture", max: 4, color: "#5dffd8", description: "Expands pickup attraction range." },
+    { group: "04 · TACTICAL", type: "cloak", name: "Cloaking Array", max: 4, color: "#d58cff", description: "Breaks targeting for 10–40 seconds." },
+    { group: "04 · TACTICAL", type: "rapidFire", name: "Rapid-Fire Charge", max: 5, color: "#ff4f71", description: "Temporary 70% weapon-delay reduction." },
+  ];
+
+  function upgradeIllustration(type) {
+    const drawings = {
+      shield: '<circle cx="40" cy="32" r="19"/><path d="M22 37c5 13 18 19 18 19s13-6 18-19V19L40 12 22 19Z"/>',
+      shieldOvercharge: '<circle cx="40" cy="34" r="23"/><circle cx="40" cy="34" r="16"/><path d="m44 13-12 22h9l-5 20 14-25h-9Z"/>',
+      armor: '<path d="m18 20 22-9 22 9-4 29-18 10-18-10Z"/><path d="m25 25 15-6 15 6-3 18-12 7-12-7Z"/><path d="M40 19v31"/>',
+      regeneration: '<path d="M20 19h40v34H20Z"/><path d="M34 25h12v9h9v12h-9v9H34v-9h-9V34h9Z"/><path d="M16 30c-6 10-2 23 8 29M64 42c5-11 0-23-11-28"/>',
+      fireRate: '<path d="M17 18h29L35 31h23L29 56l8-18H17Z"/><path d="M55 17h9M58 27h9M53 37h12"/>',
+      wideShot: '<circle cx="40" cy="51" r="6"/><path d="M40 44V12M35 44 22 16M45 44l13-28M31 47 13-23M49 47l13-23"/>',
+      ricochet: '<path d="m15 48 18-24 16 17 16-25"/><path d="m56 16 9 0-2 9M16 54l8-1-2-8"/><circle cx="33" cy="24" r="4"/><circle cx="49" cy="41" r="4"/>',
+      missile: '<path d="M53 12c-18 5-28 18-31 34l12 4 8 12 9-9c15-15 9-33 2-41Z"/><circle cx="48" cy="27" r="6"/><path d="m27 44-11 2 8 7-1 10 11-13M40 57l-2 10 8-7"/>',
+      plasma: '<circle cx="40" cy="35" r="16"/><circle cx="40" cy="35" r="25"/><path d="M15 35h50M40 10v50M23 18l34 34M57 18 23 52"/>',
+      railgun: '<path d="M20 17h12v42H20ZM48 17h12v42H48Z"/><path d="M32 24h16M32 35h16M32 46h16M15 13h50M15 63h50"/>',
+      engine: '<path d="M25 13h30l-5 31H30Z"/><path d="M30 44c0 12 10 22 10 22s10-10 10-22M36 44c0 8 4 14 4 14s4-6 4-14"/><path d="M21 20h-7v23h11M59 20h7v23H55"/>',
+      maneuver: '<circle cx="40" cy="35" r="10"/><path d="M40 25V10m0 50V45M30 35H15m50 0H50M32 27 21 16m38 38L48 43M48 27l11-11M21 54l11-11"/><path d="m36 12 4-6 4 6M36 58l4 6 4-6M17 31l-6 4 6 4M63 31l6 4-6 4"/>',
+      magnet: '<path d="M21 16v25c0 12 8 20 19 20s19-8 19-20V16H47v25c0 5-3 8-7 8s-7-3-7-8V16Z"/><path d="M21 16h12M47 16h12M17 28h16M47 28h16"/>',
+      cloak: '<path d="M12 35s11-18 28-18 28 18 28 18-11 18-28 18S12 35 12 35Z"/><circle cx="40" cy="35" r="9"/><path d="M18 58 62 12M15 21l-7 7M65 49l7-7"/>',
+      rapidFire: '<path d="m43 8-20 31h15l-4 24 23-35H42Z"/><path d="M15 18h14M11 29h13M14 50h13M53 50h13"/>',
+    };
+    return `<svg viewBox="0 0 80 72" aria-hidden="true"><g>${drawings[type]}</g></svg>`;
+  }
+
   function updateUpgradeUi() {
-    const chips = [];
-    if (upgrades.fireRate) chips.push(`<span class="upgrade-chip">OVERDRIVE ${upgrades.fireRate}</span>`);
-    if (upgrades.wideShot) chips.push(`<span class="upgrade-chip">WIDE ${upgrades.wideShot}</span>`);
-    if (upgrades.shield) chips.push(`<span class="upgrade-chip shield">SHIELD ${Math.round(shield)}/${shieldMax}</span>`);
-    if (upgrades.shieldOvercharge) chips.push(`<span class="upgrade-chip shield">OVERCHARGE ${upgrades.shieldOvercharge}</span>`);
-    if (upgrades.engine) chips.push(`<span class="upgrade-chip">ENGINE ${upgrades.engine}</span>`);
-    if (upgrades.maneuver) chips.push(`<span class="upgrade-chip">MANOEUVRE ${upgrades.maneuver}</span>`);
-    if (upgrades.armor) chips.push(`<span class="upgrade-chip">ARMOUR ${Math.round(armor)}/${armorMax}</span>`);
-    if (upgrades.regeneration) chips.push(`<span class="upgrade-chip shield">REGEN ${upgrades.regeneration}</span>`);
-    if (upgrades.magnet) chips.push(`<span class="upgrade-chip shield">MAG CAPTURE ${upgrades.magnet}</span>`);
-    if (upgrades.ricochet) chips.push(`<span class="upgrade-chip weapon">BOUNCE ×${upgrades.ricochet}</span>`);
-    if (upgrades.cloak) chips.push(`<span class="upgrade-chip${cloakTimer > 0 ? " shield" : ""}">CLOAK ${upgrades.cloak}${cloakTimer > 0 ? ` · ${Math.ceil(cloakTimer)}S` : ""}</span>`);
-    if (rapidFireTimer > 0) chips.push(`<span class="upgrade-chip weapon">RAPID ${Math.ceil(rapidFireTimer)}S</span>`);
-    if (upgrades.missile) chips.push(`<span class="upgrade-chip weapon">MISSILE ${upgrades.missile}</span>`);
-    if (upgrades.plasma) chips.push(`<span class="upgrade-chip weapon">PLASMA ${upgrades.plasma}</span>`);
-    if (upgrades.railgun) chips.push(`<span class="upgrade-chip weapon">RAIL ${upgrades.railgun}</span>`);
-    ui.upgradeList.innerHTML = chips.length ? chips.join("") : '<span class="empty-upgrades">NO UPGRADES INSTALLED</span>';
+    let currentGroup = "";
+    const cards = [];
+    for (const item of upgradeCatalog) {
+      if (item.group !== currentGroup) {
+        currentGroup = item.group;
+        cards.push(`<h3 class="upgrade-group-title"><span>${currentGroup}</span><i></i></h3>`);
+      }
+      const timedLevel = item.type === "rapidFire" ? Math.ceil((rapidFireTimer / 30) * item.max) : upgrades[item.type] || 0;
+      const level = clamp(timedLevel, 0, item.max);
+      const active = item.type === "cloak" ? cloakTimer > 0 : item.type === "rapidFire" ? rapidFireTimer > 0 : false;
+      const installed = level > 0;
+      let status = installed ? `MK ${level} / ${item.max}` : "NOT INSTALLED";
+      if (item.type === "shield" && installed) status = `${Math.round(shield)} / ${shieldMax} SHIELD`;
+      if (item.type === "armor" && installed) status = `${Math.round(armor)} / ${armorMax} ARMOUR`;
+      if (item.type === "ricochet" && installed) status = `${level} BOUNCE${level > 1 ? "S" : ""}`;
+      if (item.type === "cloak" && active) status = `ACTIVE · ${Math.ceil(cloakTimer)}S`;
+      if (item.type === "rapidFire") status = active ? `ACTIVE · ${Math.ceil(rapidFireTimer)}S` : "TEMPORARY PICKUP";
+      const pips = Array.from({ length: item.max }, (_, index) => `<i class="${index < level ? "filled" : ""}"></i>`).join("");
+      cards.push(`<article class="upgrade-card${installed ? " installed" : " locked"}${active ? " active" : ""}" style="--upgrade-color:${item.color}" aria-label="${item.name}: ${status}">
+        <div class="upgrade-picture">${upgradeIllustration(item.type)}<span>${installed ? "ONLINE" : "SCHEMATIC"}</span></div>
+        <div class="upgrade-card-copy"><small>${currentGroup.slice(5)}</small><strong>${item.name}</strong><p>${item.description}</p><div class="upgrade-level"><span>${status}</span><b>${pips}</b></div></div>
+      </article>`);
+    }
+    ui.upgradeList.innerHTML = cards.join("");
     updateFabricatorButtons();
   }
 
@@ -1419,6 +1487,119 @@
     showUpgradeToast(`ORBITAL STATION · ${defense.defense.toUpperCase()}`, "HEAVY HOSTILE CONTACT");
   }
 
+  function spawnWeaponArray() {
+    const wave = getWave();
+    const type = weaponArrayTypes[Math.floor(Math.random() * weaponArrayTypes.length)];
+    const baseHp = 12 + Math.floor(wave * 0.8);
+    const defense = rollHostileDefense(baseHp);
+    const maxHp = baseHp + defense.hpBonus;
+    const radius = random(38, 48);
+    const x = random(radius + 24, width - radius - 24);
+    weaponArrays.push({
+      id: `array-${++hostileSequence}`,
+      alive: true,
+      kind: "array",
+      type,
+      x,
+      y: -radius - 55,
+      targetY: random(125, Math.min(height * 0.34, 250)),
+      radius,
+      hp: maxHp,
+      maxHp,
+      shield: defense.shield,
+      shieldMax: defense.shield,
+      armor: defense.armor,
+      defense: defense.defense,
+      rotation: random(0, TAU),
+      phase: random(0, TAU),
+      life: random(27, 36),
+      lockProgress: 0,
+      lockCooldown: random(1.2, 2.2),
+      lockStage: 0,
+      aimX: x,
+      aimY: 95,
+      flash: 0,
+      shieldFlash: 0,
+      score: type.id === "crimson" ? 2600 : 2400,
+    });
+    showUpgradeToast(`${type.name.toUpperCase()} · ${defense.defense.toUpperCase()}`, "MISSILE-LOCK ARRAY DETECTED");
+  }
+
+  function fireArrayMissile(array) {
+    const angle = Math.atan2(ship.y - array.y, ship.x - array.x);
+    const launchSpeed = 155;
+    enemyProjectiles.push({
+      id: `hostile-missile-${++hostileSequence}`,
+      x: array.x + Math.cos(angle) * array.radius * 0.62,
+      y: array.y + Math.sin(angle) * array.radius * 0.62,
+      vx: Math.cos(angle) * launchSpeed,
+      vy: Math.sin(angle) * launchSpeed,
+      radius: 8,
+      damage: array.type.damage,
+      life: 8.5,
+      phase: random(0, TAU),
+      sourceKind: "array",
+      arrayMissile: true,
+      missileColor: array.type.color,
+      speed: array.type.missileSpeed,
+      turnRate: array.type.turnRate,
+    });
+    createSparks(array.x, array.y + array.radius * 0.45, 12, array.type.color);
+    shockwaves.push({ x: array.x, y: array.y, radius: 5, maxRadius: 42, life: 0.28, maxLife: 0.28, color: array.type.color });
+    screenShake = Math.max(screenShake, 4);
+    showUpgradeToast("HOSTILE MISSILE INBOUND", "TARGET LOCK CONFIRMED");
+    playTone("enemyMissile");
+  }
+
+  function updateWeaponArray(array, dt) {
+    array.phase += dt;
+    array.rotation += dt * (array.type.id === "crimson" ? 0.38 : -0.3);
+    array.flash = Math.max(0, array.flash - dt);
+    array.shieldFlash = Math.max(0, array.shieldFlash - dt);
+    if (array.y < array.targetY) {
+      array.y = Math.min(array.targetY, array.y + 42 * dt);
+      array.aimX = array.x;
+      array.aimY = Math.max(array.aimY, array.y + array.radius);
+      return;
+    }
+    array.life -= dt;
+    if (array.life <= 0) {
+      array.y += 52 * dt;
+      array.lockProgress = Math.max(0, array.lockProgress - dt * 1.5);
+      return;
+    }
+    if (cloakTimer > 0) {
+      array.lockProgress = Math.max(0, array.lockProgress - dt * 1.8);
+      array.lockStage = Math.floor(array.lockProgress * 4);
+      array.aimX += Math.sin(array.phase * 1.7) * 18 * dt;
+      array.aimY -= 15 * dt;
+      return;
+    }
+    if (array.lockCooldown > 0) {
+      array.lockCooldown -= dt;
+      array.lockProgress = Math.max(0, array.lockProgress - dt * 0.7);
+      return;
+    }
+    const trackingRate = array.type.id === "crimson" ? 0.88 : 0.72;
+    const follow = 1 - Math.exp(-dt * trackingRate);
+    array.aimX += (ship.x - array.aimX) * follow;
+    array.aimY += (ship.y - array.aimY) * follow;
+    const aimDistance = Math.hypot(ship.x - array.aimX, ship.y - array.aimY);
+    const trackingQuality = 1 - clamp(aimDistance / Math.max(320, height * 0.55), 0, 1);
+    array.lockProgress = clamp(array.lockProgress + (dt / array.type.lockDuration) * (0.5 + trackingQuality * 0.8), 0, 1);
+    const nextStage = Math.min(3, Math.floor(array.lockProgress * 4));
+    if (nextStage > array.lockStage) playTone("lock");
+    array.lockStage = nextStage;
+    if (array.lockProgress >= 1) {
+      fireArrayMissile(array);
+      array.lockProgress = 0;
+      array.lockStage = 0;
+      array.lockCooldown = random(4.8, 6.6);
+      array.aimX = ship.x;
+      array.aimY = ship.y;
+    }
+  }
+
   function fireEnemyWeapon(hostile) {
     const isStation = hostile.kind === "station";
     const count = isStation ? (getWave() >= 4 ? 3 : 2) : 1;
@@ -1437,6 +1618,7 @@
         life: 5.5,
         phase: random(0, TAU),
         stationBolt: isStation,
+        sourceKind: isStation ? "station" : "ship",
       });
     }
     createSparks(hostile.x, hostile.y + hostile.radius * 0.35, isStation ? 7 : 4, isStation ? "#ffb548" : hostile.type.color);
@@ -1462,16 +1644,18 @@
   }
 
   function destroyHostile(hostile) {
-    const collection = hostile.kind === "station" ? spaceStations : alienShips;
+    const collection = hostile.kind === "station" ? spaceStations : hostile.kind === "array" ? weaponArrays : alienShips;
     const index = collection.indexOf(hostile);
     if (index === -1) return;
     hostile.alive = false;
     collection.splice(index, 1);
     score += hostile.score;
-    createExplosion(hostile.x, hostile.y, hostile.radius * 1.2, hostile.kind === "station" ? 2.5 : 1.5);
-    shockwaves.push({ x: hostile.x, y: hostile.y, radius: 4, maxRadius: hostile.radius * 2, life: 0.42, maxLife: 0.42, color: hostile.kind === "station" ? "#ffb548" : hostile.type.color });
-    screenShake = Math.max(screenShake, hostile.kind === "station" ? 10 : 5);
-    if (Math.random() < (hostile.kind === "station" ? 0.55 : 0.16)) spawnUpgrade(hostile.x, hostile.y);
+    const heavy = hostile.kind === "station" || hostile.kind === "array";
+    const color = hostile.kind === "station" ? "#ffb548" : hostile.type.color;
+    createExplosion(hostile.x, hostile.y, hostile.radius * 1.2, heavy ? 2.2 : 1.5);
+    shockwaves.push({ x: hostile.x, y: hostile.y, radius: 4, maxRadius: hostile.radius * 2, life: 0.42, maxLife: 0.42, color });
+    screenShake = Math.max(screenShake, heavy ? 9 : 5);
+    if (Math.random() < (hostile.kind === "station" ? 0.55 : hostile.kind === "array" ? 0.42 : 0.16)) spawnUpgrade(hostile.x, hostile.y);
     playTone("explosion");
   }
 
@@ -1518,6 +1702,7 @@
     for (const asteroid of asteroids) consider(asteroid);
     for (const enemy of alienShips) consider(enemy);
     for (const station of spaceStations) consider(station);
+    for (const array of weaponArrays) consider(array);
     return target;
   }
 
@@ -1536,6 +1721,7 @@
     for (const asteroid of asteroids) consider(asteroid);
     for (const enemy of alienShips) consider(enemy);
     for (const station of spaceStations) consider(station);
+    for (const array of weaponArrays) consider(array);
     if (!target) return false;
     const angle = Math.atan2(target.y - projectile.y, target.x - projectile.x);
     projectile.vx = Math.cos(angle) * 760;
@@ -1595,6 +1781,12 @@
       stationClock = 0;
       nextStation = random(38, 62);
       spawnSpaceStation();
+    }
+    if (mission === 2 && settings.weaponArrays) weaponArrayClock += dt;
+    if (mission === 2 && settings.weaponArrays && weaponArrayClock >= nextWeaponArray) {
+      weaponArrayClock = 0;
+      nextWeaponArray = random(Math.max(18, 27 - getWave() * 0.45), Math.max(28, 41 - getWave() * 0.35));
+      spawnWeaponArray();
     }
     const wave = getWave();
     const spawnDelay = Math.max(0.48, 1.25 - (wave - 1) * 0.05);
@@ -1717,7 +1909,7 @@
         }
       }
       if (projectileRemoved) continue;
-      for (const hostile of [...alienShips, ...spaceStations]) {
+      for (const hostile of [...alienShips, ...spaceStations, ...weaponArrays]) {
         if (projectile.hitIds.has(hostile.id)) continue;
         const hitRadius = projectile.radius + hostile.radius * 0.76;
         if (distanceSq(projectile, hostile) <= hitRadius * hitRadius) {
@@ -1800,30 +1992,46 @@
       updateHostile(station, dt);
       if (station.y - station.radius > height + 100) spaceStations.splice(spaceStations.indexOf(station), 1);
     }
+    for (const array of [...weaponArrays]) {
+      updateWeaponArray(array, dt);
+      if (array.y - array.radius > height + 100) weaponArrays.splice(weaponArrays.indexOf(array), 1);
+    }
 
     for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
       const bolt = enemyProjectiles[i];
       bolt.life -= dt;
       bolt.phase += dt * 12;
+      if (bolt.arrayMissile && cloakTimer <= 0) {
+        const targetAngle = Math.atan2(ship.y - bolt.y, ship.x - bolt.x);
+        const follow = Math.min(1, dt * bolt.turnRate);
+        bolt.vx += (Math.cos(targetAngle) * bolt.speed - bolt.vx) * follow;
+        bolt.vy += (Math.sin(targetAngle) * bolt.speed - bolt.vy) * follow;
+      }
       bolt.x += bolt.vx * dt;
       bolt.y += bolt.vy * dt;
-      if (Math.random() < dt * 18) {
+      const projectileColor = bolt.arrayMissile ? bolt.missileColor : bolt.stationBolt ? "#ffb548" : "#ff4f9c";
+      if (Math.random() < dt * (bolt.arrayMissile ? 34 : 18)) {
         particles.push({
           x: bolt.x + random(-2, 2),
           y: bolt.y + random(-2, 2),
           vx: -bolt.vx * 0.08 + random(-12, 12),
           vy: -bolt.vy * 0.08 + random(-12, 12),
-          life: 0.18,
-          maxLife: 0.18,
-          size: random(1, 2.4),
-          color: bolt.stationBolt ? "#ffb548" : "#ff4f9c",
+          life: bolt.arrayMissile ? 0.3 : 0.18,
+          maxLife: bolt.arrayMissile ? 0.3 : 0.18,
+          size: bolt.arrayMissile ? random(1.8, 3.6) : random(1, 2.4),
+          color: projectileColor,
           drag: 0.94,
         });
       }
       const collisionRadius = bolt.radius + ship.radius * 0.72;
       if (distanceSq(bolt, ship) <= collisionRadius * collisionRadius) {
         enemyProjectiles.splice(i, 1);
-        createSparks(bolt.x, bolt.y, 9, bolt.stationBolt ? "#ffb548" : "#ff4f9c");
+        createSparks(bolt.x, bolt.y, bolt.arrayMissile ? 18 : 9, projectileColor);
+        if (bolt.arrayMissile) {
+          createExplosion(bolt.x, bolt.y, 31, 1.35);
+          shockwaves.push({ x: bolt.x, y: bolt.y, radius: 3, maxRadius: 68, life: 0.3, maxLife: 0.3, color: projectileColor });
+          playTone("explosion");
+        }
         damageShip(bolt.damage, bolt.x, bolt.y);
         continue;
       }
@@ -1973,7 +2181,7 @@
     ui.shieldBar.style.width = `${shieldMax > 0 ? (shield / shieldMax) * 100 : 0}%`;
     ui.armor.textContent = armorMax > 0 ? `${Math.round(armor)} / ${armorMax}` : "UNPLATED";
     ui.armorBar.style.width = `${armorMax > 0 ? (armor / armorMax) * 100 : 0}%`;
-    const contacts = asteroids.length + shootingStars.length + planets.length + solarPlanets.length + spaceObjects.length + alienShips.length + spaceStations.length;
+    const contacts = asteroids.length + shootingStars.length + planets.length + solarPlanets.length + spaceObjects.length + alienShips.length + spaceStations.length + weaponArrays.length;
     ui.threats.textContent = `${contacts} ${contacts === 1 ? "CONTACT" : "CONTACTS"}`;
     updateMissionHud();
     if (forceRadar) updateRadar();
@@ -2016,9 +2224,9 @@
       dot.style.top = `${clamp((object.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
     }
-    for (const hostile of [...alienShips, ...spaceStations]) {
+    for (const hostile of [...alienShips, ...spaceStations, ...weaponArrays]) {
       const dot = document.createElement("i");
-      dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : ""}`;
+      dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : hostile.kind === "array" ? " array-dot" : ""}`;
       dot.style.left = `${clamp((hostile.x / width) * 60 + 4, 3, 64)}px`;
       dot.style.top = `${clamp((hostile.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
@@ -2047,7 +2255,9 @@
     for (const planet of planets) drawPlanet(planet);
     for (const star of shootingStars) drawShootingStar(star);
     for (const asteroid of asteroids) drawAsteroid(asteroid);
+    for (const array of weaponArrays) drawWeaponArrayTargeting(array);
     for (const station of spaceStations) drawSpaceStation(station);
+    for (const array of weaponArrays) drawWeaponArray(array);
     for (const enemy of alienShips) drawAlienShip(enemy);
     for (const drop of resourceDrops) drawResourceDrop(drop);
     for (const pickup of powerUps) drawPowerUp(pickup);
@@ -2774,6 +2984,152 @@
     ctx.restore();
   }
 
+  function drawWeaponArrayTargeting(array) {
+    if (array.y < 0 || array.life <= 0) return;
+    const color = array.type.color;
+    const active = array.lockCooldown <= 0 && cloakTimer <= 0;
+    const progress = array.lockProgress;
+    const reticleRadius = 34 - progress * 17;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = active ? 0.22 + progress * 0.62 : 0.12;
+    const beam = ctx.createLinearGradient(array.x, array.y, array.aimX, array.aimY);
+    beam.addColorStop(0, color);
+    beam.addColorStop(0.7, `${color}88`);
+    beam.addColorStop(1, "rgba(255,255,255,0.95)");
+    ctx.strokeStyle = beam;
+    ctx.lineWidth = 0.8 + progress * 1.8;
+    ctx.setLineDash(progress > 0.82 ? [] : [5, 8]);
+    ctx.lineDashOffset = -array.phase * 22;
+    ctx.beginPath();
+    ctx.moveTo(array.x, array.y + array.radius * 0.35);
+    ctx.lineTo(array.aimX, array.aimY);
+    ctx.stroke();
+
+    ctx.translate(array.aimX, array.aimY);
+    ctx.rotate(array.phase * (array.type.id === "crimson" ? 0.8 : -0.7));
+    ctx.setLineDash([]);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.4 + progress * 1.4;
+    ctx.shadowBlur = 11 + progress * 16;
+    ctx.shadowColor = color;
+    for (let quadrant = 0; quadrant < 4; quadrant += 1) {
+      ctx.save();
+      ctx.rotate(quadrant * Math.PI / 2);
+      ctx.beginPath();
+      ctx.arc(0, 0, reticleRadius, -0.48, 0.48);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(reticleRadius - 7, 0);
+      ctx.lineTo(reticleRadius + 7, 0);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = color;
+    ctx.globalAlpha = active ? 0.5 + progress * 0.5 : 0.25;
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.2 + progress * 2.6, 0, TAU);
+    ctx.fill();
+    ctx.rotate(-array.phase * (array.type.id === "crimson" ? 0.8 : -0.7));
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = color;
+    ctx.font = "900 8px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    const status = cloakTimer > 0 ? "TARGET LOST · CLOAK" : active ? `MISSILE LOCK ${Math.round(progress * 100)}%` : "ARRAY REACQUIRING";
+    ctx.fillText(status, 0, reticleRadius + 18);
+    ctx.restore();
+  }
+
+  function drawWeaponArray(array) {
+    const r = array.radius;
+    const color = array.type.color;
+    ctx.save();
+    ctx.translate(array.x, array.y);
+
+    if (array.shieldMax > 0 && array.shield > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = array.shieldFlash > 0 ? 0.95 : 0.18 + Math.sin(array.phase * 4) * 0.04;
+      ctx.strokeStyle = "#5de9ff";
+      ctx.lineWidth = array.shieldFlash > 0 ? 4 : 1.4;
+      ctx.shadowBlur = 19;
+      ctx.shadowColor = "#5de9ff";
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.18, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.rotate(array.rotation);
+    ctx.fillStyle = array.armor > 0 ? "#52606b" : "#212938";
+    ctx.strokeStyle = array.flash > 0 ? "#ffffff" : color;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = color;
+    ctx.beginPath();
+    for (let point = 0; point < 8; point += 1) {
+      const angle = -Math.PI / 2 + point * TAU / 8;
+      const radius = point % 2 === 0 ? r * 0.88 : r * 0.68;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (point === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(215, 239, 250, 0.42)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.52, 0, TAU);
+    ctx.stroke();
+    for (let arm = 0; arm < 4; arm += 1) {
+      ctx.save();
+      ctx.rotate(arm * Math.PI / 2);
+      ctx.fillStyle = "#111923";
+      ctx.strokeStyle = color;
+      ctx.fillRect(r * 0.45, -r * 0.12, r * 0.52, r * 0.24);
+      ctx.strokeRect(r * 0.45, -r * 0.12, r * 0.52, r * 0.24);
+      ctx.fillStyle = arm % 2 === 0 ? color : "#c5d6de";
+      ctx.beginPath();
+      ctx.arc(r * 0.83, 0, r * 0.075, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    const core = ctx.createRadialGradient(-r * 0.08, -r * 0.12, 0, 0, 0, r * 0.42);
+    core.addColorStop(0, "#ffffff");
+    core.addColorStop(0.24, color);
+    core.addColorStop(1, "rgba(4, 10, 20, 0)");
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.42, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.12);
+    ctx.lineTo(array.aimX - array.x, array.aimY - array.y);
+    ctx.stroke();
+
+    drawHostileStatus(array);
+    const barWidth = r * 1.5;
+    ctx.fillStyle = "rgba(1, 5, 12, 0.84)";
+    ctx.fillRect(-barWidth / 2, r + 11, barWidth, 4);
+    ctx.fillStyle = color;
+    ctx.fillRect(-barWidth / 2, r + 11, barWidth * array.lockProgress, 4);
+    ctx.font = "900 7px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = color;
+    ctx.fillText(array.lockCooldown > 0 ? "MISSILE ARRAY · STANDBY" : `MISSILE ARRAY · LOCK ${Math.round(array.lockProgress * 100)}%`, 0, r + 25);
+    ctx.restore();
+  }
+
   function drawSpaceStation(station) {
     const r = station.radius;
     ctx.save();
@@ -2852,6 +3208,50 @@
     ctx.translate(bolt.x, bolt.y);
     ctx.rotate(Math.atan2(bolt.vy, bolt.vx));
     ctx.globalCompositeOperation = "lighter";
+    if (bolt.arrayMissile) {
+      const color = bolt.missileColor;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = color;
+      const exhaust = ctx.createLinearGradient(-42, 0, -4, 0);
+      exhaust.addColorStop(0, "rgba(255, 92, 40, 0)");
+      exhaust.addColorStop(0.62, color);
+      exhaust.addColorStop(1, "#ffffff");
+      ctx.strokeStyle = exhaust;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-42, 0);
+      ctx.lineTo(-5, 0);
+      ctx.stroke();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#d9e4e9";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(11, 0);
+      ctx.lineTo(3, -5);
+      ctx.lineTo(-8, -4);
+      ctx.lineTo(-12, 0);
+      ctx.lineTo(-8, 4);
+      ctx.lineTo(3, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-6, -3);
+      ctx.lineTo(-13, -9);
+      ctx.lineTo(-10, -1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-6, 3);
+      ctx.lineTo(-13, 9);
+      ctx.lineTo(-10, 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
     const color = bolt.stationBolt ? "#ffb548" : "#ff4f9c";
     ctx.shadowBlur = bolt.stationBolt ? 22 : 16;
     ctx.shadowColor = color;
@@ -3922,6 +4322,13 @@
     } else if (type === "ricochet") {
       sfxVoice({ start: 980, end: 1780, duration: 0.09, volume: 0.065, shape: "triangle", pan: random(-0.5, 0.5) });
       sfxVoice({ start: 1960, end: 820, duration: 0.07, volume: 0.035, shape: "sine", delay: 0.025 });
+    } else if (type === "lock") {
+      sfxVoice({ start: 720, end: 960, duration: 0.08, volume: 0.085, shape: "square" });
+      sfxVoice({ start: 1440, end: 1180, duration: 0.06, volume: 0.035, shape: "sine", delay: 0.035 });
+    } else if (type === "enemyMissile") {
+      sfxVoice({ start: 176, end: 58, duration: 0.52, volume: 0.18, shape: "sawtooth" });
+      sfxNoise({ duration: 0.5, volume: 0.16, frequency: 1900, endFrequency: 95, filterType: "bandpass" });
+      sfxVoice({ start: 880, end: 440, duration: 0.18, volume: 0.08, shape: "square", delay: 0.06 });
     } else if (type === "upgrade" || type === "complete") {
       const notes = type === "complete" ? [392, 523.25, 659.25, 783.99] : [293.66, 440, 587.33];
       notes.forEach((note, index) => {
