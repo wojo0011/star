@@ -27,6 +27,7 @@ jobs:
         run: |
           node --check game.js
           node tests/static.test.mjs
+          node tests/performance.test.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
