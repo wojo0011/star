@@ -45,6 +45,7 @@ canvas.getContext = () => canvasContext;
 elements.set("gameCanvas", canvas);
 
 const document = {
+  body: new MockElement("body"),
   hidden: false,
   addEventListener() {},
   querySelectorAll() { return []; },
@@ -75,6 +76,7 @@ let source = await readFile(new URL("../game.js", import.meta.url), "utf8");
 const bootMarker = "  requestAnimationFrame(frame);\n})();";
 assert.ok(source.includes(bootMarker), "game boot marker should remain instrumentable");
 source = source.replace(bootMarker, `  globalThis.__starPerformanceTest = {
+    startMissionOne,
     fire,
     update,
     draw,
@@ -85,6 +87,8 @@ source = source.replace(bootMarker, `  globalThis.__starPerformanceTest = {
     shockwaves,
     asteroids,
     limits: PERFORMANCE_LIMITS,
+    getState() { return state; },
+    getLaunchIntroElapsed() { return launchIntroElapsed; },
     setStressMode() {
       state = "running";
       mission = 2;
@@ -154,6 +158,13 @@ context.globalThis = context;
 vm.runInContext(source, context, { filename: "game.js" });
 
 const game = context.__starPerformanceTest;
+game.startMissionOne();
+assert.equal(game.getState(), "intro", "launch should begin with the cinematic state");
+game.draw();
+for (let frame = 0; frame < 242; frame += 1) game.update(1 / 30, frame * (1000 / 30));
+assert.equal(game.getState(), "running", "the eight-second launch cinematic should hand off to Mission 1");
+assert.equal(game.getLaunchIntroElapsed(), 8);
+
 game.setStressMode();
 
 for (let shot = 0; shot < 900; shot += 1) game.fire(1000 + shot * 24);
