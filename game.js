@@ -194,6 +194,16 @@
     { at: 116, type: "telescope", label: "HELIOPAUSE TELESCOPE", side: 0.74, scale: 1.12 },
   ];
   const SOLAR_MISSION_DURATION = 128;
+  const LAUNCH_INTRO_DURATION = 8;
+  const launchIntroCues = [
+    { at: 0.12, type: "introPulse", strength: 1 },
+    { at: 0.72, type: "countdown", strength: 3 },
+    { at: 1.68, type: "countdown", strength: 2 },
+    { at: 2.64, type: "countdown", strength: 1 },
+    { at: 3.55, type: "launch", strength: 1 },
+    { at: 5.52, type: "separation", strength: 1 },
+    { at: 6.42, type: "reveal", strength: 1 },
+  ];
   const alienShipTypes = [
     { id: "scout", name: "Alien scout", radius: 23, hp: 4, speed: 82, score: 420, color: "#ff5d9e" },
     { id: "raider", name: "Alien raider", radius: 29, hp: 7, speed: 66, score: 760, color: "#c86cff" },
@@ -242,6 +252,8 @@
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
   let lastTime = performance.now();
   let state = "idle";
+  let launchIntroElapsed = 0;
+  let launchIntroCueIndex = 0;
   let mission = 1;
   let missionElapsed = 0;
   let solarEventIndex = 0;
@@ -482,6 +494,7 @@
 
   function prepareRunningState() {
     state = "running";
+    document.body.classList.remove("cinematic-active");
     ui.start.classList.remove("visible");
     ui.pause.classList.remove("visible");
     ui.gameOver.classList.remove("visible");
@@ -510,17 +523,41 @@
     });
   }
 
-  function startMissionOne() {
-    if (state === "running") return;
-    unlockAudio();
-    resetMissionMusic();
-    mission = 1;
-    resetGame();
+  function completeLaunchIntro() {
+    if (state !== "intro") return;
+    launchIntroElapsed = LAUNCH_INTRO_DURATION;
     spawnEarthDeparture();
     prepareRunningState();
     ui.announcer.textContent = "Mission one launched from Earth. Leave the Solar System.";
     screenShake = 7;
-    playTone("launch");
+  }
+
+  function startMissionOne() {
+    if (state === "running" || state === "intro") return;
+    unlockAudio();
+    resetMissionMusic();
+    mission = 1;
+    resetGame();
+    state = "intro";
+    launchIntroElapsed = 0;
+    launchIntroCueIndex = 0;
+    ui.start.classList.remove("visible");
+    ui.pause.classList.remove("visible");
+    ui.gameOver.classList.remove("visible");
+    ui.missionComplete.classList.remove("visible");
+    document.body.classList.add("cinematic-active");
+    lastTime = performance.now();
+    ui.announcer.textContent = "The mission: explore space. Launch sequence started. T minus three.";
+  }
+
+  function updateLaunchIntro(dt) {
+    launchIntroElapsed = Math.min(LAUNCH_INTRO_DURATION, launchIntroElapsed + dt);
+    while (launchIntroCueIndex < launchIntroCues.length && launchIntroElapsed >= launchIntroCues[launchIntroCueIndex].at) {
+      const cue = launchIntroCues[launchIntroCueIndex];
+      playTone(cue.type, cue.strength);
+      launchIntroCueIndex += 1;
+    }
+    if (launchIntroElapsed >= LAUNCH_INTRO_DURATION) completeLaunchIntro();
   }
 
   function clearSectorForMissionTwo() {
@@ -595,7 +632,7 @@
   }
 
   function togglePause(forceResume = false) {
-    if (state === "idle" || state === "gameover" || state === "missioncomplete" || state === "config" || state === "options") return;
+    if (state === "idle" || state === "intro" || state === "gameover" || state === "missioncomplete" || state === "config" || state === "options") return;
     if (state === "paused" || forceResume) {
       state = "running";
       ui.pause.classList.remove("visible");
@@ -610,6 +647,7 @@
   }
 
   function setConfigOpen(open) {
+    if (state === "intro" && open) return;
     if (open && ui.configPopover.hidden) {
       if (!ui.settingsPopover.hidden) setSettingsOpen(false);
       configReturnState = state;
@@ -630,6 +668,7 @@
   }
 
   function setSettingsOpen(open) {
+    if (state === "intro" && open) return;
     if (open && ui.settingsPopover.hidden) {
       if (!ui.configPopover.hidden) setConfigOpen(false);
       settingsReturnState = state;
@@ -1805,6 +1844,10 @@
   function update(dt, now) {
     if (state === "paused" || state === "config" || state === "options") return;
     updateStars(dt);
+    if (state === "intro") {
+      updateLaunchIntro(dt);
+      return;
+    }
     if (state !== "running") return;
 
     elapsed += dt;
@@ -2326,6 +2369,11 @@
     ctx.fillRect(0, 0, width, height);
     drawNebula();
     drawStars();
+    if (state === "intro") {
+      drawLaunchIntro();
+      ctx.restore();
+      return;
+    }
     if (mission === 1) drawSolarBackdrop();
 
     const shakeX = settings.screenShake && screenShake ? random(-screenShake, screenShake) : 0;
@@ -2349,6 +2397,418 @@
     drawEffects();
     if (state !== "gameover") drawShip();
     ctx.restore();
+  }
+
+  function introEase(value) {
+    const progress = clamp(value, 0, 1);
+    return 1 - (1 - progress) ** 3;
+  }
+
+  function drawCinematicEarth(retreat, spaceMix) {
+    const radius = Math.max(width * 0.68, height * 0.62);
+    const centerX = width * 0.5;
+    const centerY = height + radius * 0.34 + retreat * height * 0.48;
+    ctx.save();
+    ctx.globalAlpha = 1 - spaceMix * 0.78;
+    ctx.shadowBlur = 44;
+    ctx.shadowColor = "rgba(82, 183, 255, 0.72)";
+    const atmosphere = ctx.createRadialGradient(centerX - radius * 0.22, centerY - radius * 0.5, radius * 0.05, centerX, centerY, radius);
+    atmosphere.addColorStop(0, "#4db8df");
+    atmosphere.addColorStop(0.48, "#17668f");
+    atmosphere.addColorStop(0.82, "#09365a");
+    atmosphere.addColorStop(1, "#04182d");
+    ctx.fillStyle = atmosphere;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, TAU);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius - 3, 0, TAU);
+    ctx.clip();
+    ctx.fillStyle = "rgba(79, 137, 77, 0.82)";
+    ctx.beginPath();
+    ctx.ellipse(centerX - radius * 0.25, centerY - radius * 0.68, radius * 0.24, radius * 0.12, -0.25, 0, TAU);
+    ctx.ellipse(centerX + radius * 0.31, centerY - radius * 0.58, radius * 0.2, radius * 0.09, 0.18, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(235, 251, 255, 0.34)";
+    ctx.lineWidth = Math.max(3, radius * 0.012);
+    for (let band = 0; band < 5; band += 1) {
+      ctx.beginPath();
+      ctx.ellipse(centerX + Math.sin(band * 2.1) * radius * 0.18, centerY - radius * (0.78 - band * 0.075), radius * (0.32 - band * 0.025), radius * 0.025, band % 2 ? 0.08 : -0.1, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = `rgba(129, 221, 255, ${0.72 - spaceMix * 0.5})`;
+    ctx.lineWidth = Math.max(3, radius * 0.012);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius + 3, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawLaunchPad(baseX, baseY, scale, alpha) {
+    if (alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(baseX, baseY);
+    ctx.strokeStyle = "#64798a";
+    ctx.fillStyle = "#172635";
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    ctx.fillRect(-145 * scale, 0, 290 * scale, 18 * scale);
+    ctx.strokeRect(-145 * scale, 0, 290 * scale, 18 * scale);
+    ctx.fillStyle = "#263947";
+    ctx.fillRect(-114 * scale, -188 * scale, 24 * scale, 188 * scale);
+    ctx.strokeRect(-114 * scale, -188 * scale, 24 * scale, 188 * scale);
+    ctx.beginPath();
+    for (let level = 0; level < 6; level += 1) {
+      const y = -level * 31 * scale;
+      ctx.moveTo(-114 * scale, y);
+      ctx.lineTo(-90 * scale, y - 31 * scale);
+      ctx.moveTo(-90 * scale, y);
+      ctx.lineTo(-114 * scale, y - 31 * scale);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "#405767";
+    ctx.fillRect(-90 * scale, -158 * scale, 75 * scale, 9 * scale);
+    ctx.fillStyle = "#ff9c45";
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "#ff6b2c";
+    for (let light = 0; light < 5; light += 1) {
+      ctx.beginPath();
+      ctx.arc((-128 + light * 64) * scale, 8 * scale, 2.2 * scale, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawCinematicPlume(x, y, scale, intensity, launchProgress) {
+    if (intensity <= 0) return;
+    const plumeLength = (75 + launchProgress * 155) * scale * intensity;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const flame = ctx.createLinearGradient(x, y, x, y + plumeLength);
+    flame.addColorStop(0, "#ffffff");
+    flame.addColorStop(0.18, "#fff2a8");
+    flame.addColorStop(0.48, "#ff8b29");
+    flame.addColorStop(0.76, "rgba(255, 59, 25, 0.72)");
+    flame.addColorStop(1, "rgba(64, 151, 255, 0)");
+    ctx.fillStyle = flame;
+    ctx.shadowBlur = 30 * scale;
+    ctx.shadowColor = "#ff6b2c";
+    ctx.beginPath();
+    ctx.moveTo(x - 13 * scale, y);
+    ctx.quadraticCurveTo(x - 21 * scale, y + plumeLength * 0.48, x, y + plumeLength);
+    ctx.quadraticCurveTo(x + 21 * scale, y + plumeLength * 0.48, x + 13 * scale, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(205, 241, 255, 0.9)";
+    ctx.beginPath();
+    ctx.moveTo(x - 5 * scale, y);
+    ctx.lineTo(x, y + plumeLength * 0.58);
+    ctx.lineTo(x + 5 * scale, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawCinematicSmoke(time, rocketX, rocketBaseY, padY, scale, launchProgress) {
+    if (time < 3.34) return;
+    const ignition = clamp((time - 3.34) / 0.36, 0, 1);
+    ctx.save();
+    for (let puff = 0; puff < 34; puff += 1) {
+      const seed = puff * 9.73;
+      const age = ((time - 3.34) * (0.27 + (puff % 5) * 0.018) + puff / 34) % 1;
+      const trailBias = puff % 3 === 0 && launchProgress > 0.18;
+      const sourceY = trailBias ? rocketBaseY : padY;
+      const spread = (28 + age * (trailBias ? 78 : 155)) * scale;
+      const x = rocketX + Math.sin(seed) * spread;
+      const y = sourceY + age * (trailBias ? 170 : 54) * scale + Math.cos(seed * 0.63) * 11 * scale;
+      const radius = (8 + age * (trailBias ? 25 : 43) + (puff % 4) * 2) * scale;
+      const gray = 142 + (puff % 4) * 18;
+      ctx.globalAlpha = ignition * (1 - age) * (trailBias ? 0.34 : 0.52);
+      ctx.fillStyle = `rgb(${gray}, ${gray + 5}, ${gray + 10})`;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawRocketBooster(side, x, y, scale, separation) {
+    const direction = side < 0 ? -1 : 1;
+    const alpha = 1 - clamp((separation - 0.68) / 0.32, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x + direction * separation * 72 * scale, y + separation * 88 * scale);
+    ctx.rotate(direction * separation * 0.52);
+    ctx.fillStyle = "#dce5e9";
+    ctx.strokeStyle = "#718595";
+    ctx.lineWidth = 1.5 * scale;
+    ctx.beginPath();
+    ctx.moveTo(direction * 23 * scale, -67 * scale);
+    ctx.quadraticCurveTo(direction * 32 * scale, -56 * scale, direction * 32 * scale, -42 * scale);
+    ctx.lineTo(direction * 32 * scale, 73 * scale);
+    ctx.lineTo(direction * 17 * scale, 73 * scale);
+    ctx.lineTo(direction * 17 * scale, -48 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ff6b2c";
+    ctx.fillRect(direction * 17 * scale, 22 * scale, direction * 15 * scale, 9 * scale);
+    ctx.restore();
+  }
+
+  function drawCinematicRocket(x, y, scale, time, separation, reveal) {
+    const rocketAlpha = 1 - clamp((reveal - 0.72) / 0.28, 0, 1);
+    drawRocketBooster(-1, x, y, scale, separation);
+    drawRocketBooster(1, x, y, scale, separation);
+    ctx.save();
+    ctx.globalAlpha = rocketAlpha;
+    ctx.translate(x, y);
+    ctx.strokeStyle = "#728797";
+    ctx.lineWidth = 1.5 * scale;
+    const body = ctx.createLinearGradient(-20 * scale, 0, 20 * scale, 0);
+    body.addColorStop(0, "#6f818d");
+    body.addColorStop(0.25, "#dbe6eb");
+    body.addColorStop(0.56, "#ffffff");
+    body.addColorStop(1, "#879ba8");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.moveTo(-18 * scale, -76 * scale);
+    ctx.lineTo(-22 * scale, 77 * scale);
+    ctx.lineTo(22 * scale, 77 * scale);
+    ctx.lineTo(18 * scale, -76 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#172b3a";
+    ctx.fillRect(-21 * scale, 24 * scale, 42 * scale, 17 * scale);
+    ctx.fillStyle = "#57e8ff";
+    ctx.shadowBlur = 12 * scale;
+    ctx.shadowColor = "#56f4ff";
+    ctx.fillRect(-21 * scale, -31 * scale, 42 * scale, 5 * scale);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#253947";
+    ctx.beginPath();
+    ctx.moveTo(-22 * scale, 66 * scale);
+    ctx.lineTo(-32 * scale, 86 * scale);
+    ctx.lineTo(-11 * scale, 80 * scale);
+    ctx.lineTo(11 * scale, 80 * scale);
+    ctx.lineTo(32 * scale, 86 * scale);
+    ctx.lineTo(22 * scale, 66 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    if (reveal <= 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      const cone = ctx.createLinearGradient(-25 * scale, -130 * scale, 25 * scale, -74 * scale);
+      cone.addColorStop(0, "#8598a4");
+      cone.addColorStop(0.48, "#ffffff");
+      cone.addColorStop(1, "#708491");
+      ctx.fillStyle = cone;
+      ctx.strokeStyle = "#78909e";
+      ctx.lineWidth = 1.5 * scale;
+      ctx.beginPath();
+      ctx.moveTo(0, -139 * scale);
+      ctx.lineTo(19 * scale, -76 * scale);
+      ctx.lineTo(-19 * scale, -76 * scale);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.globalAlpha = 1 - reveal;
+        ctx.translate(x + side * reveal * 48 * scale, y - reveal * 18 * scale);
+        ctx.rotate(side * reveal * 0.5);
+        ctx.fillStyle = side < 0 ? "#a9b8c0" : "#e8f2f5";
+        ctx.strokeStyle = "#728895";
+        ctx.lineWidth = 1.4 * scale;
+        ctx.beginPath();
+        ctx.moveTo(0, -139 * scale);
+        ctx.lineTo(side * 19 * scale, -76 * scale);
+        ctx.lineTo(0, -76 * scale);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawCinematicSpacecraft(x, y, scale, reveal) {
+    if (reveal <= 0) return;
+    const eased = introEase(reveal);
+    ctx.save();
+    ctx.globalAlpha = clamp(reveal * 1.7, 0, 1);
+    ctx.translate(x, y - eased * 62 * scale);
+    ctx.scale(scale * (0.45 + eased * 0.55), scale * (0.45 + eased * 0.55));
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = "#56f4ff";
+    const exhaust = ctx.createLinearGradient(0, 14, 0, 72);
+    exhaust.addColorStop(0, "#ffffff");
+    exhaust.addColorStop(0.25, "#56f4ff");
+    exhaust.addColorStop(1, "rgba(34, 86, 255, 0)");
+    ctx.fillStyle = exhaust;
+    ctx.beginPath();
+    ctx.moveTo(-8, 15);
+    ctx.lineTo(0, 74 + Math.sin(launchIntroElapsed * 18) * 7);
+    ctx.lineTo(8, 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.shadowBlur = 16;
+    const hull = ctx.createLinearGradient(-28, -32, 28, 26);
+    hull.addColorStop(0, "#ecfbff");
+    hull.addColorStop(0.34, "#7695a5");
+    hull.addColorStop(0.72, "#324b5a");
+    hull.addColorStop(1, "#122431");
+    ctx.fillStyle = hull;
+    ctx.strokeStyle = "#8cf6ff";
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(0, -39);
+    ctx.lineTo(10, -14);
+    ctx.lineTo(34, 13);
+    ctx.lineTo(17, 24);
+    ctx.lineTo(0, 17);
+    ctx.lineTo(-17, 24);
+    ctx.lineTo(-34, 13);
+    ctx.lineTo(-10, -14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#07364a";
+    ctx.strokeStyle = "#56f4ff";
+    ctx.beginPath();
+    ctx.moveTo(0, -27);
+    ctx.lineTo(6, -9);
+    ctx.lineTo(0, 5);
+    ctx.lineTo(-6, -9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ff6b2c";
+    ctx.shadowColor = "#ff6b2c";
+    ctx.shadowBlur = 9;
+    ctx.fillRect(-29, 12, 5, 2);
+    ctx.fillRect(24, 12, 5, 2);
+    ctx.restore();
+  }
+
+  function drawLaunchIntroTypography(time) {
+    const narrow = width < 700;
+    const titleX = narrow ? width * 0.5 : width * 0.065;
+    const titleAlign = narrow ? "center" : "left";
+    const titleAlpha = 1 - clamp((time - 4.25) / 0.8, 0, 1);
+    ctx.save();
+    ctx.textAlign = titleAlign;
+    ctx.textBaseline = "alphabetic";
+    ctx.globalAlpha = titleAlpha;
+    ctx.fillStyle = "#8da2ba";
+    ctx.font = `800 ${clamp(width * 0.016, 11, 18)}px ui-monospace, monospace`;
+    ctx.fillText("THE MISSION:", titleX, narrow ? height * 0.105 : height * 0.115);
+    ctx.fillStyle = "#f4fbff";
+    ctx.shadowBlur = 22;
+    ctx.shadowColor = "rgba(86, 244, 255, 0.48)";
+    ctx.font = `900 ${clamp(width * (narrow ? 0.075 : 0.052), 28, 72)}px Arial Narrow, sans-serif`;
+    ctx.fillText("EXPLORE SPACE", titleX, narrow ? height * 0.16 : height * 0.205);
+    ctx.shadowBlur = 0;
+
+    if (time >= 0.58 && time < 3.55) {
+      const number = time < 1.68 ? 3 : time < 2.64 ? 2 : 1;
+      const cueStart = number === 3 ? 0.58 : number === 2 ? 1.58 : 2.54;
+      const pulse = clamp((time - cueStart) / 0.22, 0, 1);
+      const countX = narrow ? width * 0.78 : width * 0.82;
+      const countY = narrow ? height * 0.42 : height * 0.48;
+      ctx.globalAlpha = 0.92;
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#67efff";
+      ctx.font = `800 ${clamp(width * 0.014, 10, 16)}px ui-monospace, monospace`;
+      ctx.fillText("T MINUS", countX, countY - clamp(Math.min(width, height) * 0.18, 88, 150));
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowBlur = 28;
+      ctx.shadowColor = "#56f4ff";
+      ctx.font = `900 ${clamp(Math.min(width, height) * 0.2, 74, 184)}px Arial Narrow, sans-serif`;
+      ctx.fillText(String(number), countX, countY + clamp(width * 0.04, 35, 62));
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `rgba(86, 244, 255, ${0.25 + pulse * 0.55})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(countX, countY - 5, clamp(Math.min(width, height) * (0.11 + (1 - pulse) * 0.035), 48, 108), -Math.PI / 2, -Math.PI / 2 + TAU * pulse);
+      ctx.stroke();
+    }
+
+    let status = "LAUNCH SYSTEMS · GO";
+    if (time >= 3.55) status = "LIFTOFF · EARTH DEPARTURE";
+    if (time >= 5.52) status = "BOOSTER SEPARATION · CONFIRMED";
+    if (time >= 6.42) status = "FAIRING RELEASE · STARFALL DEPLOY";
+    if (time >= 7.24) status = "STARFALL ONLINE · MISSION 01";
+    ctx.globalAlpha = 1;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(1, 5, 12, 0.76)";
+    ctx.fillRect(0, height - 49, width, 49);
+    ctx.fillStyle = time >= 7.24 ? "#43ffc0" : "#75efff";
+    ctx.font = `800 ${clamp(width * 0.012, 9, 14)}px ui-monospace, monospace`;
+    ctx.fillText(status, 22, height - 21);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#8292a8";
+    ctx.fillText(`${String(Math.min(8, Math.floor(time) + 1)).padStart(2, "0")} / 08 SEC`, width - 22, height - 21);
+    ctx.fillStyle = "rgba(86, 244, 255, 0.18)";
+    ctx.fillRect(0, height - 4, width, 4);
+    ctx.fillStyle = "#56f4ff";
+    ctx.fillRect(0, height - 4, width * clamp(time / LAUNCH_INTRO_DURATION, 0, 1), 4);
+    ctx.globalAlpha = 0.7;
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#d6e8f1";
+    ctx.font = `700 ${clamp(width * 0.01, 8, 11)}px ui-monospace, monospace`;
+    ctx.fillText("SPACE TO SKIP", width - 22, 27);
+    ctx.restore();
+  }
+
+  function drawLaunchIntro() {
+    const time = launchIntroElapsed;
+    const launchProgress = introEase((time - 3.55) / 2.05);
+    const spaceMix = introEase((time - 4.4) / 2.25);
+    const separation = introEase((time - 5.52) / 0.95);
+    const reveal = introEase((time - 6.42) / 1.18);
+    const scale = clamp(Math.min(width / 1160, height / 790), 0.58, 1.18) * (1 - launchProgress * 0.18);
+    const initialRocketY = height * 0.64;
+    const rocketX = width * 0.5;
+    const rocketY = initialRocketY + (height * 0.31 - initialRocketY) * launchProgress;
+    const padY = initialRocketY + 89 * scale;
+
+    ctx.save();
+    const sky = ctx.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0, `rgba(1, 5, 15, ${0.48 - spaceMix * 0.28})`);
+    sky.addColorStop(0.62, `rgba(9, 37, 66, ${0.82 - spaceMix * 0.7})`);
+    sky.addColorStop(1, `rgba(22, 88, 124, ${0.86 - spaceMix * 0.82})`);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, width, height);
+    drawCinematicEarth(launchProgress, spaceMix);
+    drawLaunchPad(rocketX, padY, scale, 1 - clamp(launchProgress * 1.55, 0, 1));
+
+    const ignition = clamp((time - 3.34) / 0.34, 0, 1);
+    drawCinematicSmoke(time, rocketX, rocketY + 80 * scale, padY, scale, launchProgress);
+    drawCinematicPlume(rocketX, rocketY + 78 * scale, scale, ignition * (1 - reveal), launchProgress);
+    drawCinematicRocket(rocketX, rocketY, scale, time, separation, reveal);
+    drawCinematicSpacecraft(rocketX, rocketY - 58 * scale, scale * 1.45, reveal);
+
+    if (time > 7.55) {
+      ctx.globalAlpha = clamp((time - 7.55) / 0.45, 0, 1) * 0.32;
+      ctx.fillStyle = "#dffbff";
+      ctx.fillRect(0, 0, width, height);
+    }
+    ctx.restore();
+    drawLaunchIntroTypography(time);
   }
 
   function drawNebula() {
@@ -4451,6 +4911,23 @@
     } else if (type === "enemy") {
       sfxVoice({ start: 270, end: 82, duration: 0.2, volume: 0.1, shape: "sawtooth", pan: random(-0.55, 0.55) });
       sfxNoise({ duration: 0.11, volume: 0.06, frequency: 2400, endFrequency: 380, filterType: "bandpass" });
+    } else if (type === "introPulse") {
+      sfxVoice({ start: 48, end: 74, duration: 3.25, volume: 0.13, shape: "sine", pan: -0.16 });
+      sfxVoice({ start: 96, end: 148, duration: 3.1, volume: 0.055, shape: "triangle", pan: 0.16 });
+      sfxNoise({ duration: 3.15, volume: 0.035, frequency: 110, endFrequency: 680, filterType: "bandpass" });
+    } else if (type === "countdown") {
+      const note = 520 + (3 - strength) * 125;
+      sfxVoice({ start: note, end: note * 0.98, duration: 0.22, volume: 0.13, shape: "square" });
+      sfxVoice({ start: note * 2, end: note * 1.45, duration: 0.16, volume: 0.055, shape: "sine", delay: 0.025 });
+    } else if (type === "separation") {
+      sfxNoise({ duration: 0.34, volume: 0.14, frequency: 3400, endFrequency: 180, filterType: "bandpass", pan: -0.28 });
+      sfxNoise({ duration: 0.34, volume: 0.14, frequency: 3400, endFrequency: 180, filterType: "bandpass", delay: 0.06, pan: 0.28 });
+      sfxVoice({ start: 170, end: 54, duration: 0.38, volume: 0.12, shape: "triangle" });
+    } else if (type === "reveal") {
+      [392, 587.33, 783.99].forEach((note, index) => {
+        sfxVoice({ start: note, end: note * 1.5, duration: 0.52, volume: 0.075, shape: "triangle", delay: index * 0.08, pan: (index - 1) * 0.3 });
+      });
+      sfxNoise({ duration: 0.48, volume: 0.055, frequency: 420, endFrequency: 4200, filterType: "bandpass" });
     } else if (type === "launch") {
       sfxVoice({ start: 48, end: 122, duration: 1.15, volume: 0.2, shape: "sine" });
       sfxVoice({ start: 96, end: 610, duration: 0.88, volume: 0.11, shape: "sawtooth", delay: 0.08 });
@@ -4478,6 +4955,10 @@
 
   window.addEventListener("keydown", (event) => {
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(event.code)) event.preventDefault();
+    if (state === "intro") {
+      if (event.code === "Space" || event.code === "Enter") completeLaunchIntro();
+      return;
+    }
     if (event.code === "Tab" && !event.repeat) {
       event.preventDefault();
       if (state !== "gameover") setConfigOpen(ui.configPopover.hidden);
@@ -4525,6 +5006,9 @@
   document.getElementById("missionTwoButton").addEventListener("click", () => startMissionTwo(true));
   document.getElementById("resumeButton").addEventListener("click", () => togglePause(true));
   document.getElementById("pauseButton").addEventListener("click", () => togglePause());
+  canvas.addEventListener("pointerdown", () => {
+    if (state === "intro") completeLaunchIntro();
+  });
   document.querySelectorAll(".weapon-slot").forEach((card) => {
     card.addEventListener("click", () => selectWeapon(card.dataset.weapon));
   });
