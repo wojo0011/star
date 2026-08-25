@@ -14,7 +14,9 @@ A fast, responsive browser-based space shooter built with the Canvas API.
 
 ## Campaign
 
-The game opens with a short Mission 1 story and briefing. The player launches from Earth, dives toward the Sun for a gravity assist, flies past Mercury and Venus, passes Mars, crosses a dense asteroid belt, and navigates past Jupiter, Saturn, Uranus, and Neptune before reaching the heliopause. The Solar System bodies use dedicated visual models, colors, atmosphere, surface features, solar plasma, storms, ice caps, cloud bands, and rings. Planetary and solar collisions remain fatal.
+The game opens with a short Mission 1 story and briefing. Pressing launch begins an eight-second, full-screen canvas cinematic titled **The Mission: Explore Space**: a detailed rocket waits above the curved Earth, the flight computer counts down T−3, T−2, T−1, engines ignite with fire and rolling smoke, the rocket climbs into space, its boosters separate, the nose fairing opens, and the Starfall player ship emerges before control passes seamlessly to the mission. The sequence includes synchronized original launch, countdown, separation, and ship-reveal sound design, scales to desktop and mobile, and can be skipped with Space, Enter, or a tap.
+
+The player then dives toward the Sun for a gravity assist, flies past Mercury and Venus, passes Mars, crosses a dense asteroid belt, and navigates past Jupiter, Saturn, Uranus, and Neptune before reaching the heliopause. The Solar System bodies use dedicated visual models, colors, atmosphere, surface features, solar plasma, storms, ice caps, cloud bands, and rings. Planetary and solar collisions remain fatal.
 
 Mission 1 is also populated with detailed human-built infrastructure: relay satellites, orbital and heliopause telescopes, solar and planetary probes, science platforms, asteroid-mining rigs, refinery drones, and deep-space science arrays. These labelled contacts are scenery and do not damage the player.
 
