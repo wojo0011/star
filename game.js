@@ -60,6 +60,25 @@
     plasma: { name: "Plasma Cannon", description: "Piercing energy orb", delay: 310 },
     railgun: { name: "Rail Driver", description: "Heavy piercing shot", delay: 760 },
   };
+  const PERFORMANCE_LIMITS = Object.freeze({
+    playerProjectiles: 240,
+    enemyProjectiles: 120,
+    particles: 600,
+    shockwaves: 64,
+    detailedProjectiles: 90,
+    detailedParticles: 260,
+  });
+  const SFX_COOLDOWNS = Object.freeze({
+    laser: 0.075,
+    missile: 0.11,
+    plasma: 0.09,
+    railgun: 0.13,
+    ricochet: 0.05,
+    impact: 0.055,
+    explosion: 0.08,
+    shield: 0.065,
+    enemy: 0.06,
+  });
   const resourceCatalog = {
     iron: { name: "Iron", symbol: "Fe", color: "#aeb5bc", value: 1 },
     nickel: { name: "Nickel", symbol: "Ni", color: "#ccd3c7", value: 1 },
@@ -256,6 +275,7 @@
   let currentMusicTrack = null;
   let noiseBuffer = null;
   const musicBuffers = new Map();
+  const lastSfxTimes = new Map();
   let radarClock = 0;
   let mobileFiring = false;
   let asteroidSequence = 0;
@@ -291,6 +311,7 @@
   const spaceStations = [];
   const weaponArrays = [];
   const enemyProjectiles = [];
+  const hostileCollections = [alienShips, spaceStations, weaponArrays];
   const mobileVector = { x: 0, y: 0 };
   const resourceInventory = {};
   const upgrades = {
@@ -321,6 +342,47 @@
     invulnerable: 0,
     tilt: 0,
   };
+
+  let projectileRecycleCursor = 0;
+  let enemyProjectileRecycleCursor = 0;
+
+  function addPlayerProjectile(projectile) {
+    if (projectiles.length < PERFORMANCE_LIMITS.playerProjectiles) {
+      projectiles.push(projectile);
+      return;
+    }
+    projectiles[projectileRecycleCursor % projectiles.length] = projectile;
+    projectileRecycleCursor = (projectileRecycleCursor + 1) % PERFORMANCE_LIMITS.playerProjectiles;
+  }
+
+  function addEnemyProjectile(projectile) {
+    if (enemyProjectiles.length < PERFORMANCE_LIMITS.enemyProjectiles) {
+      enemyProjectiles.push(projectile);
+      return;
+    }
+    enemyProjectiles[enemyProjectileRecycleCursor % enemyProjectiles.length] = projectile;
+    enemyProjectileRecycleCursor = (enemyProjectileRecycleCursor + 1) % PERFORMANCE_LIMITS.enemyProjectiles;
+  }
+
+  function getEffectsLoad() {
+    return Math.max(
+      projectiles.length / PERFORMANCE_LIMITS.playerProjectiles,
+      particles.length / PERFORMANCE_LIMITS.particles,
+    );
+  }
+
+  function pushParticle(particle) {
+    if (!settings.particles || particles.length >= PERFORMANCE_LIMITS.particles) return false;
+    particles.push(particle);
+    return true;
+  }
+
+  function pushShockwave(wave) {
+    if (!settings.particles) return false;
+    if (shockwaves.length >= PERFORMANCE_LIMITS.shockwaves) shockwaves.shift();
+    shockwaves.push(wave);
+    return true;
+  }
 
   function resize() {
     width = window.innerWidth;
@@ -818,7 +880,7 @@
       for (let i = 0; i < count; i += 1) {
         const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
         const angle = ratio * spread * 2;
-        projectiles.push({
+        addPlayerProjectile({
           type: "laser",
           x: ship.x + ratio * (22 + wide * 5),
           y: ship.y - 25 + Math.abs(ratio) * 4,
@@ -838,7 +900,7 @@
       const count = 1 + Math.floor(wide / 2) + (level >= 3 ? 1 : 0);
       for (let i = 0; i < count; i += 1) {
         const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
-        projectiles.push({
+        addPlayerProjectile({
           type: "missile",
           x: ship.x + ratio * 32,
           y: ship.y - 23,
@@ -861,7 +923,7 @@
       for (let i = 0; i < count; i += 1) {
         const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
         const angle = ratio * wide * 0.11;
-        projectiles.push({
+        addPlayerProjectile({
           type: "plasma",
           x: ship.x + ratio * 26,
           y: ship.y - 29,
@@ -882,7 +944,7 @@
       for (let i = 0; i < count; i += 1) {
         const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
         const angle = ratio * 0.2;
-        projectiles.push({
+        addPlayerProjectile({
           type: "railgun",
           x: ship.x + ratio * 34,
           y: ship.y - 34,
@@ -939,7 +1001,8 @@
         spawnUpgrade(asteroid.x, asteroid.y);
       }
       if (cause === "missile") {
-        for (const nearby of [...asteroids]) {
+        for (let nearbyIndex = asteroids.length - 1; nearbyIndex >= 0; nearbyIndex -= 1) {
+          const nearby = asteroids[nearbyIndex];
           const blast = asteroid.radius + 66;
           if (distanceSq(asteroid, nearby) < blast * blast) damageAsteroid(nearby, 1, "missile-blast");
         }
@@ -1082,7 +1145,7 @@
     selectWeapon(weapon, false);
     showUpgradeToast(label);
     createExplosion(ship.x, ship.y, 34, 0.7);
-    shockwaves.push({ x: ship.x, y: ship.y, radius: 5, maxRadius: 74, life: 0.48, maxLife: 0.48, color: "#b56cff" });
+    pushShockwave({ x: ship.x, y: ship.y, radius: 5, maxRadius: 74, life: 0.48, maxLife: 0.48, color: "#b56cff" });
     playTone("upgrade");
   }
 
@@ -1218,10 +1281,12 @@
 
   function createSparks(x, y, count, color) {
     if (!settings.particles) return;
-    for (let i = 0; i < count; i += 1) {
+    const load = getEffectsLoad();
+    const adjustedCount = load > 0.82 ? Math.ceil(count * 0.25) : load > 0.58 ? Math.ceil(count * 0.5) : count;
+    for (let i = 0; i < adjustedCount && particles.length < PERFORMANCE_LIMITS.particles; i += 1) {
       const angle = random(0, TAU);
       const speed = random(40, 180);
-      particles.push({
+      pushParticle({
         x,
         y,
         vx: Math.cos(angle) * speed,
@@ -1237,13 +1302,15 @@
 
   function createExplosion(x, y, radius, strength = 1) {
     if (!settings.particles) return;
-    const count = Math.round(clamp(radius * 0.75, 12, 42));
-    shockwaves.push({ x, y, radius: 2, maxRadius: radius * 1.75, life: 0.38, maxLife: 0.38 });
-    for (let i = 0; i < count; i += 1) {
+    const load = getEffectsLoad();
+    const baseCount = Math.round(clamp(radius * 0.75, 12, 42));
+    const count = load > 0.82 ? Math.ceil(baseCount * 0.35) : load > 0.58 ? Math.ceil(baseCount * 0.62) : baseCount;
+    pushShockwave({ x, y, radius: 2, maxRadius: radius * 1.75, life: 0.38, maxLife: 0.38 });
+    for (let i = 0; i < count && particles.length < PERFORMANCE_LIMITS.particles; i += 1) {
       const angle = random(0, TAU);
       const speed = random(45, 220) * strength;
       const hot = Math.random() > 0.42;
-      particles.push({
+      pushParticle({
         x: x + random(-4, 4),
         y: y + random(-4, 4),
         vx: Math.cos(angle) * speed,
@@ -1268,7 +1335,7 @@
       shield -= absorbed;
       remainingDamage -= absorbed;
       shieldAbsorbed = absorbed;
-      shockwaves.push({ x: ship.x, y: ship.y, radius: 24, maxRadius: 48, life: 0.3, maxLife: 0.3, color: "#63b8ff" });
+      pushShockwave({ x: ship.x, y: ship.y, radius: 24, maxRadius: 48, life: 0.3, maxLife: 0.3, color: "#63b8ff" });
       createSparks(x, y, 12, "#63b8ff");
       playTone("shield");
     }
@@ -1278,7 +1345,7 @@
       remainingDamage -= absorbed;
       armorAbsorbed = absorbed;
       createSparks(x, y, 15, "#e1eef5");
-      shockwaves.push({ x: ship.x, y: ship.y, radius: 19, maxRadius: 37, life: 0.24, maxLife: 0.24, color: "#dce8ef" });
+      pushShockwave({ x: ship.x, y: ship.y, radius: 19, maxRadius: 37, life: 0.24, maxLife: 0.24, color: "#dce8ef" });
     }
     if (remainingDamage > 0) {
       health = Math.max(0, health - remainingDamage);
@@ -1528,7 +1595,7 @@
   function fireArrayMissile(array) {
     const angle = Math.atan2(ship.y - array.y, ship.x - array.x);
     const launchSpeed = 155;
-    enemyProjectiles.push({
+    addEnemyProjectile({
       id: `hostile-missile-${++hostileSequence}`,
       x: array.x + Math.cos(angle) * array.radius * 0.62,
       y: array.y + Math.sin(angle) * array.radius * 0.62,
@@ -1545,7 +1612,7 @@
       turnRate: array.type.turnRate,
     });
     createSparks(array.x, array.y + array.radius * 0.45, 12, array.type.color);
-    shockwaves.push({ x: array.x, y: array.y, radius: 5, maxRadius: 42, life: 0.28, maxLife: 0.28, color: array.type.color });
+    pushShockwave({ x: array.x, y: array.y, radius: 5, maxRadius: 42, life: 0.28, maxLife: 0.28, color: array.type.color });
     screenShake = Math.max(screenShake, 4);
     showUpgradeToast("HOSTILE MISSILE INBOUND", "TARGET LOCK CONFIRMED");
     playTone("enemyMissile");
@@ -1608,7 +1675,7 @@
     for (let i = 0; i < count; i += 1) {
       const ratio = count === 1 ? 0 : i / (count - 1) - 0.5;
       const angle = baseAngle + ratio * (isStation ? 0.2 : 0.08);
-      enemyProjectiles.push({
+      addEnemyProjectile({
         x: hostile.x + Math.cos(angle) * hostile.radius * 0.45,
         y: hostile.y + Math.sin(angle) * hostile.radius * 0.45,
         vx: Math.cos(angle) * speed,
@@ -1653,7 +1720,7 @@
     const heavy = hostile.kind === "station" || hostile.kind === "array";
     const color = hostile.kind === "station" ? "#ffb548" : hostile.type.color;
     createExplosion(hostile.x, hostile.y, hostile.radius * 1.2, heavy ? 2.2 : 1.5);
-    shockwaves.push({ x: hostile.x, y: hostile.y, radius: 4, maxRadius: hostile.radius * 2, life: 0.42, maxLife: 0.42, color });
+    pushShockwave({ x: hostile.x, y: hostile.y, radius: 4, maxRadius: hostile.radius * 2, life: 0.42, maxLife: 0.42, color });
     screenShake = Math.max(screenShake, heavy ? 9 : 5);
     if (Math.random() < (hostile.kind === "station" ? 0.55 : hostile.kind === "array" ? 0.42 : 0.16)) spawnUpgrade(hostile.x, hostile.y);
     playTone("explosion");
@@ -1730,7 +1797,7 @@
     projectile.pierce = 1;
     projectile.x += Math.cos(angle) * 6;
     projectile.y += Math.sin(angle) * 6;
-    shockwaves.push({ x: projectile.x, y: projectile.y, radius: 2, maxRadius: 24, life: 0.18, maxLife: 0.18, color: "#71f7ff" });
+    pushShockwave({ x: projectile.x, y: projectile.y, radius: 2, maxRadius: 24, life: 0.18, maxLife: 0.18, color: "#71f7ff" });
     playTone("ricochet");
     return true;
   }
@@ -1823,6 +1890,7 @@
 
     if (keys.has("Space") || mobileFiring) fire(now);
 
+    const trailQuality = clamp(1 - getEffectsLoad() * 0.88, 0.12, 1);
     for (let i = projectiles.length - 1; i >= 0; i -= 1) {
       const projectile = projectiles[i];
       projectile.life -= dt;
@@ -1841,9 +1909,9 @@
           projectile.vy += (Math.sin(angle) * 390 - projectile.vy) * Math.min(1, dt * 3.4);
         }
         projectile.trailClock += dt;
-        if (projectile.trailClock > 0.06 && particles.length < 650) {
+        if (projectile.trailClock > 0.06 / trailQuality) {
           projectile.trailClock = 0;
-          particles.push({
+          pushParticle({
             x: projectile.x,
             y: projectile.y + 7,
             vx: random(-12, 12),
@@ -1857,8 +1925,8 @@
         }
       } else if (projectile.type === "plasma") {
         projectile.phase += dt * 11;
-        if (Math.random() < dt * 24) {
-          particles.push({
+        if (Math.random() < dt * 24 * trailQuality) {
+          pushParticle({
             x: projectile.x + random(-4, 4),
             y: projectile.y + random(-2, 7),
             vx: random(-20, 20),
@@ -1870,8 +1938,8 @@
             drag: 0.95,
           });
         }
-      } else if (projectile.type === "railgun" && Math.random() < dt * 30) {
-        particles.push({
+      } else if (projectile.type === "railgun" && Math.random() < dt * 30 * trailQuality) {
+        pushParticle({
           x: projectile.x + random(-3, 3),
           y: projectile.y + 10,
           vx: random(-9, 9),
@@ -1890,7 +1958,8 @@
         continue;
       }
       let projectileRemoved = false;
-      for (const asteroid of [...asteroids]) {
+      for (let asteroidIndex = asteroids.length - 1; asteroidIndex >= 0; asteroidIndex -= 1) {
+        const asteroid = asteroids[asteroidIndex];
         if (projectile.hitIds.has(asteroid.id)) continue;
         const hitRadius = projectile.radius + asteroid.radius;
         if (distanceSq(projectile, asteroid) <= hitRadius * hitRadius) {
@@ -1898,7 +1967,7 @@
           projectile.pierce -= 1;
           damageAsteroid(asteroid, projectile.damage, projectile.type);
           if (projectile.type === "missile") {
-            shockwaves.push({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
+            pushShockwave({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
           }
           ricochetLaser(projectile, asteroid);
           if (projectile.pierce <= 0) {
@@ -1909,27 +1978,32 @@
         }
       }
       if (projectileRemoved) continue;
-      for (const hostile of [...alienShips, ...spaceStations, ...weaponArrays]) {
-        if (projectile.hitIds.has(hostile.id)) continue;
-        const hitRadius = projectile.radius + hostile.radius * 0.76;
-        if (distanceSq(projectile, hostile) <= hitRadius * hitRadius) {
-          projectile.hitIds.add(hostile.id);
-          projectile.pierce -= 1;
-          damageHostile(hostile, projectile.damage, projectile.type);
-          if (projectile.type === "missile") {
-            shockwaves.push({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
-          }
-          ricochetLaser(projectile, hostile);
-          if (projectile.pierce <= 0) {
-            projectiles.splice(i, 1);
-            projectileRemoved = true;
-            break;
+      hostileCollision:
+      for (const collection of hostileCollections) {
+        for (let hostileIndex = collection.length - 1; hostileIndex >= 0; hostileIndex -= 1) {
+          const hostile = collection[hostileIndex];
+          if (projectile.hitIds.has(hostile.id)) continue;
+          const hitRadius = projectile.radius + hostile.radius * 0.76;
+          if (distanceSq(projectile, hostile) <= hitRadius * hitRadius) {
+            projectile.hitIds.add(hostile.id);
+            projectile.pierce -= 1;
+            damageHostile(hostile, projectile.damage, projectile.type);
+            if (projectile.type === "missile") {
+              pushShockwave({ x: projectile.x, y: projectile.y, radius: 3, maxRadius: 74, life: 0.32, maxLife: 0.32, color: "#ff8545" });
+            }
+            ricochetLaser(projectile, hostile);
+            if (projectile.pierce <= 0) {
+              projectiles.splice(i, 1);
+              projectileRemoved = true;
+              break hostileCollision;
+            }
           }
         }
       }
     }
 
-    for (const asteroid of [...asteroids]) {
+    for (let asteroidIndex = asteroids.length - 1; asteroidIndex >= 0; asteroidIndex -= 1) {
+      const asteroid = asteroids[asteroidIndex];
       asteroid.x += asteroid.vx * dt;
       asteroid.y += asteroid.vy * dt;
       asteroid.rotation += asteroid.rotationSpeed * dt;
@@ -1943,11 +2017,12 @@
         continue;
       }
       if (asteroid.y - asteroid.radius > height) {
-        asteroids.splice(asteroids.indexOf(asteroid), 1);
+        asteroids.splice(asteroidIndex, 1);
       }
     }
 
-    for (const planet of [...planets]) {
+    for (let planetIndex = planets.length - 1; planetIndex >= 0; planetIndex -= 1) {
+      const planet = planets[planetIndex];
       planet.y += planet.vy * dt;
       planet.rotation += planet.rotationSpeed * dt;
       planet.phase += dt;
@@ -1958,10 +2033,11 @@
         endGame("PLANETARY IMPACT");
         return;
       }
-      if (planet.y - planet.radius > height + 40) planets.splice(planets.indexOf(planet), 1);
+      if (planet.y - planet.radius > height + 40) planets.splice(planetIndex, 1);
     }
 
-    for (const planet of [...solarPlanets]) {
+    for (let planetIndex = solarPlanets.length - 1; planetIndex >= 0; planetIndex -= 1) {
+      const planet = solarPlanets[planetIndex];
       planet.y += planet.vy * dt;
       planet.rotation += planet.rotationSpeed * dt;
       planet.phase += dt;
@@ -1974,27 +2050,31 @@
           return;
         }
       }
-      if (planet.y - planet.radius > height + 120) solarPlanets.splice(solarPlanets.indexOf(planet), 1);
+      if (planet.y - planet.radius > height + 120) solarPlanets.splice(planetIndex, 1);
     }
 
-    for (const object of [...spaceObjects]) {
+    for (let objectIndex = spaceObjects.length - 1; objectIndex >= 0; objectIndex -= 1) {
+      const object = spaceObjects[objectIndex];
       object.y += object.vy * dt;
       object.rotation += object.rotationSpeed * dt;
       object.phase += dt;
-      if (object.y > height + 110) spaceObjects.splice(spaceObjects.indexOf(object), 1);
+      if (object.y > height + 110) spaceObjects.splice(objectIndex, 1);
     }
 
-    for (const enemy of [...alienShips]) {
+    for (let enemyIndex = alienShips.length - 1; enemyIndex >= 0; enemyIndex -= 1) {
+      const enemy = alienShips[enemyIndex];
       updateHostile(enemy, dt);
-      if (enemy.y - enemy.radius > height + 70) alienShips.splice(alienShips.indexOf(enemy), 1);
+      if (enemy.y - enemy.radius > height + 70) alienShips.splice(enemyIndex, 1);
     }
-    for (const station of [...spaceStations]) {
+    for (let stationIndex = spaceStations.length - 1; stationIndex >= 0; stationIndex -= 1) {
+      const station = spaceStations[stationIndex];
       updateHostile(station, dt);
-      if (station.y - station.radius > height + 100) spaceStations.splice(spaceStations.indexOf(station), 1);
+      if (station.y - station.radius > height + 100) spaceStations.splice(stationIndex, 1);
     }
-    for (const array of [...weaponArrays]) {
+    for (let arrayIndex = weaponArrays.length - 1; arrayIndex >= 0; arrayIndex -= 1) {
+      const array = weaponArrays[arrayIndex];
       updateWeaponArray(array, dt);
-      if (array.y - array.radius > height + 100) weaponArrays.splice(weaponArrays.indexOf(array), 1);
+      if (array.y - array.radius > height + 100) weaponArrays.splice(arrayIndex, 1);
     }
 
     for (let i = enemyProjectiles.length - 1; i >= 0; i -= 1) {
@@ -2010,8 +2090,8 @@
       bolt.x += bolt.vx * dt;
       bolt.y += bolt.vy * dt;
       const projectileColor = bolt.arrayMissile ? bolt.missileColor : bolt.stationBolt ? "#ffb548" : "#ff4f9c";
-      if (Math.random() < dt * (bolt.arrayMissile ? 34 : 18)) {
-        particles.push({
+      if (Math.random() < dt * (bolt.arrayMissile ? 34 : 18) * trailQuality) {
+        pushParticle({
           x: bolt.x + random(-2, 2),
           y: bolt.y + random(-2, 2),
           vx: -bolt.vx * 0.08 + random(-12, 12),
@@ -2029,7 +2109,7 @@
         createSparks(bolt.x, bolt.y, bolt.arrayMissile ? 18 : 9, projectileColor);
         if (bolt.arrayMissile) {
           createExplosion(bolt.x, bolt.y, 31, 1.35);
-          shockwaves.push({ x: bolt.x, y: bolt.y, radius: 3, maxRadius: 68, life: 0.3, maxLife: 0.3, color: projectileColor });
+          pushShockwave({ x: bolt.x, y: bolt.y, radius: 3, maxRadius: 68, life: 0.3, maxLife: 0.3, color: projectileColor });
           playTone("explosion");
         }
         damageShip(bolt.damage, bolt.x, bolt.y);
@@ -2224,12 +2304,14 @@
       dot.style.top = `${clamp((object.y / height) * 54 + 4, 3, 57)}px`;
       ui.radar.appendChild(dot);
     }
-    for (const hostile of [...alienShips, ...spaceStations, ...weaponArrays]) {
-      const dot = document.createElement("i");
-      dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : hostile.kind === "array" ? " array-dot" : ""}`;
-      dot.style.left = `${clamp((hostile.x / width) * 60 + 4, 3, 64)}px`;
-      dot.style.top = `${clamp((hostile.y / height) * 54 + 4, 3, 57)}px`;
-      ui.radar.appendChild(dot);
+    for (const collection of hostileCollections) {
+      for (const hostile of collection) {
+        const dot = document.createElement("i");
+        dot.className = `radar-dot hostile-dot${hostile.kind === "station" ? " station-dot" : hostile.kind === "array" ? " array-dot" : ""}`;
+        dot.style.left = `${clamp((hostile.x / width) * 60 + 4, 3, 64)}px`;
+        dot.style.top = `${clamp((hostile.y / height) * 54 + 4, 3, 57)}px`;
+        ui.radar.appendChild(dot);
+      }
     }
   }
 
@@ -2262,7 +2344,8 @@
     for (const drop of resourceDrops) drawResourceDrop(drop);
     for (const pickup of powerUps) drawPowerUp(pickup);
     for (const projectile of enemyProjectiles) drawEnemyProjectile(projectile);
-    for (const projectile of projectiles) drawProjectile(projectile);
+    const simplifyProjectiles = projectiles.length > PERFORMANCE_LIMITS.detailedProjectiles;
+    for (const projectile of projectiles) drawProjectile(projectile, simplifyProjectiles);
     drawEffects();
     if (state !== "gameover") drawShip();
     ctx.restore();
@@ -3408,17 +3491,21 @@
     ctx.restore();
   }
 
-  function drawProjectile(projectile) {
+  function drawProjectile(projectile, simplified = false) {
     ctx.save();
     ctx.translate(projectile.x, projectile.y);
     if (projectile.type === "laser") {
-      ctx.shadowBlur = 13;
+      ctx.shadowBlur = simplified ? 0 : 13;
       ctx.shadowColor = "#56f4ff";
-      const beam = ctx.createLinearGradient(0, -18, 0, 9);
-      beam.addColorStop(0, "rgba(86,244,255,0)");
-      beam.addColorStop(0.45, "#56f4ff");
-      beam.addColorStop(1, "#fff");
-      ctx.strokeStyle = beam;
+      if (simplified) {
+        ctx.strokeStyle = "#8df9ff";
+      } else {
+        const beam = ctx.createLinearGradient(0, -18, 0, 9);
+        beam.addColorStop(0, "rgba(86,244,255,0)");
+        beam.addColorStop(0.45, "#56f4ff");
+        beam.addColorStop(1, "#fff");
+        ctx.strokeStyle = beam;
+      }
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, 9);
@@ -3427,7 +3514,7 @@
     } else if (projectile.type === "missile") {
       const angle = Math.atan2(projectile.vy, projectile.vx) + Math.PI / 2;
       ctx.rotate(angle);
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = simplified ? 0 : 15;
       ctx.shadowColor = "#ff6b2c";
       ctx.fillStyle = "#e8f7ff";
       ctx.strokeStyle = "#ff8a45";
@@ -3442,46 +3529,58 @@
     } else if (projectile.type === "plasma") {
       const pulse = 1 + Math.sin(projectile.phase) * 0.12;
       ctx.scale(pulse, pulse);
-      ctx.globalCompositeOperation = "lighter";
-      ctx.shadowBlur = 24;
+      ctx.globalCompositeOperation = simplified ? "source-over" : "lighter";
+      ctx.shadowBlur = simplified ? 0 : 24;
       ctx.shadowColor = "#b56cff";
-      const orb = ctx.createRadialGradient(-2, -3, 1, 0, 0, projectile.radius * 1.35);
-      orb.addColorStop(0, "#ffffff");
-      orb.addColorStop(0.24, "#e4b6ff");
-      orb.addColorStop(0.6, "#9b43df");
-      orb.addColorStop(1, "rgba(110, 28, 196, 0)");
-      ctx.fillStyle = orb;
+      if (simplified) {
+        ctx.fillStyle = "#c776ff";
+      } else {
+        const orb = ctx.createRadialGradient(-2, -3, 1, 0, 0, projectile.radius * 1.35);
+        orb.addColorStop(0, "#ffffff");
+        orb.addColorStop(0.24, "#e4b6ff");
+        orb.addColorStop(0.6, "#9b43df");
+        orb.addColorStop(1, "rgba(110, 28, 196, 0)");
+        ctx.fillStyle = orb;
+      }
       ctx.beginPath();
-      ctx.arc(0, 0, projectile.radius * 1.35, 0, TAU);
+      ctx.arc(0, 0, projectile.radius * (simplified ? 0.86 : 1.35), 0, TAU);
       ctx.fill();
-      ctx.strokeStyle = "rgba(224, 180, 255, 0.75)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, projectile.radius * 1.6, projectile.radius * 0.62, projectile.phase, 0, TAU);
-      ctx.stroke();
+      if (!simplified) {
+        ctx.strokeStyle = "rgba(224, 180, 255, 0.75)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, projectile.radius * 1.6, projectile.radius * 0.62, projectile.phase, 0, TAU);
+        ctx.stroke();
+      }
     } else if (projectile.type === "railgun") {
-      ctx.globalCompositeOperation = "lighter";
-      ctx.shadowBlur = 19;
+      ctx.globalCompositeOperation = simplified ? "source-over" : "lighter";
+      ctx.shadowBlur = simplified ? 0 : 19;
       ctx.shadowColor = "#ffe36e";
-      const bolt = ctx.createLinearGradient(0, -38, 0, 15);
-      bolt.addColorStop(0, "rgba(255, 227, 110, 0)");
-      bolt.addColorStop(0.28, "#ffe36e");
-      bolt.addColorStop(0.64, "#ffffff");
-      bolt.addColorStop(1, "rgba(255, 184, 54, 0.2)");
-      ctx.strokeStyle = bolt;
+      if (simplified) {
+        ctx.strokeStyle = "#ffe36e";
+      } else {
+        const bolt = ctx.createLinearGradient(0, -38, 0, 15);
+        bolt.addColorStop(0, "rgba(255, 227, 110, 0)");
+        bolt.addColorStop(0.28, "#ffe36e");
+        bolt.addColorStop(0.64, "#ffffff");
+        bolt.addColorStop(1, "rgba(255, 184, 54, 0.2)");
+        ctx.strokeStyle = bolt;
+      }
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(0, 15);
       ctx.lineTo(0, -38);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(255, 227, 110, 0.48)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(-4, 9);
-      ctx.lineTo(-4, -28);
-      ctx.moveTo(4, 9);
-      ctx.lineTo(4, -28);
-      ctx.stroke();
+      if (!simplified) {
+        ctx.strokeStyle = "rgba(255, 227, 110, 0.48)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-4, 9);
+        ctx.lineTo(-4, -28);
+        ctx.moveTo(4, 9);
+        ctx.lineTo(4, -28);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -3561,11 +3660,15 @@
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+    const simplifyParticles = particles.length > PERFORMANCE_LIMITS.detailedParticles;
+    if (simplifyParticles) ctx.shadowBlur = 0;
     for (const particle of particles) {
       const alpha = clamp(particle.life / particle.maxLife, 0, 1);
       ctx.globalAlpha = alpha;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = particle.color;
+      if (!simplifyParticles) {
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = particle.color;
+      }
       ctx.fillStyle = particle.color;
       ctx.beginPath();
       ctx.arc(particle.x, particle.y, Math.max(0.2, particle.size * alpha), 0, TAU);
@@ -4286,6 +4389,11 @@
 
   function playTone(type, strength = 1) {
     if (!soundEnabled || !audioContext || !sfxBus) return;
+    const cooldown = SFX_COOLDOWNS[type] || 0;
+    const sfxNow = audioContext.currentTime;
+    const dynamicCooldown = cooldown * (1 + getEffectsLoad() * 0.75);
+    if (cooldown > 0 && sfxNow - (lastSfxTimes.get(type) ?? -Infinity) < dynamicCooldown) return;
+    if (cooldown > 0) lastSfxTimes.set(type, sfxNow);
     const power = clamp(strength, 0.45, 2.5);
     if (type === "laser") {
       sfxVoice({ start: 1450, end: 190, duration: 0.15, volume: 0.12, shape: "sawtooth", pan: random(-0.18, 0.18) });
