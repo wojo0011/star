@@ -62,7 +62,9 @@ Destroyed asteroids can release permanent upgrades for the current mission:
 
 Each installed upgrade visibly changes the detailed ship model. Your high score is saved locally in the browser.
 
-Missile guidance caches its target and reacquires at a controlled interval instead of scanning every entity on every animation frame. Missile exhaust also uses a capped, lower-frequency particle trail to keep large volleys smooth.
+Combat rendering has bounded budgets for player shots, hostile shots, particles, shockwaves, and layered sound effects. Sustained rapid fire remains responsive by recycling the oldest projectile only after the projectile budget is full, iterating collision targets without per-frame array copies, coalescing repeated weapon sounds, and progressively simplifying glows, trails, and sparks as combat load rises. Gameplay projectiles and hit detection take priority over cosmetic effects.
+
+Missile guidance caches its target and reacquires at a controlled interval instead of scanning every entity on every animation frame. Missile exhaust also uses a load-aware, lower-frequency particle trail to keep large volleys smooth.
 
 ## Run locally
 
