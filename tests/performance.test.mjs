@@ -89,6 +89,11 @@ source = source.replace(bootMarker, `  globalThis.__starPerformanceTest = {
     limits: PERFORMANCE_LIMITS,
     getState() { return state; },
     getLaunchIntroElapsed() { return launchIntroElapsed; },
+    getUpgradeMarkup() { return ui.upgradeList.innerHTML; },
+    setMatter(value) { matterBalance = value; updateResourceUi(); },
+    fabricate,
+    getUpgradeLevel(type) { return upgrades[type] || 0; },
+    getMatter() { return matterBalance; },
     startTestAssist(path = [0.25, 0.5, 0.75]) {
       state = "running";
       mission = 1;
@@ -192,6 +197,14 @@ game.draw();
 for (let frame = 0; frame < 242; frame += 1) game.update(1 / 30, frame * (1000 / 30));
 assert.equal(game.getState(), "running", "the eight-second launch cinematic should hand off to Mission 1");
 assert.equal(game.getLaunchIntroElapsed(), 8);
+assert.match(game.getUpgradeMarkup(), /data-fabricate="missile"/);
+assert.match(game.getUpgradeMarkup(), /FABRICATE · 18 MU|18 MU · NEED/);
+assert.match(game.getUpgradeMarkup(), /data-fabricate="hullRepair"/);
+game.setMatter(100);
+assert.match(game.getUpgradeMarkup(), /FABRICATE · 18 MU/, "card prices should update when collected matter makes an upgrade affordable");
+game.fabricate("missile");
+assert.equal(game.getUpgradeLevel("missile"), 1, "the illustrated missile card action should fabricate its upgrade");
+assert.equal(game.getMatter(), 82, "card fabrication should deduct the displayed matter price");
 
 game.startTestAssist();
 game.passNextAssistGate();
